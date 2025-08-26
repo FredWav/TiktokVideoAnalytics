@@ -1,4 +1,217 @@
-</div>
+import { useState, useEffect } from "react";
+
+export default function Home() {
+  const [url, setUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState("analyze");
+  const [patterns, setPatterns] = useState(null);
+  const [loadingPatterns, setLoadingPatterns] = useState(false);
+  const [selectedNiche, setSelectedNiche] = useState("Humour");
+
+  const niches = [
+    { value: "Humour", label: "Humour", icon: "😂" },
+    { value: "Danse", label: "Danse", icon: "💃" },
+    { value: "Beauté/Mode", label: "Beauté/Mode", icon: "💄" },
+    { value: "Cuisine", label: "Cuisine", icon: "🍔" },
+    { value: "Fitness/Sport", label: "Fitness/Sport", icon: "💪" },
+    { value: "Éducation", label: "Éducation", icon: "📚" },
+    { value: "Tech", label: "Tech", icon: "💻" },
+    { value: "Gaming", label: "Gaming", icon: "🎮" },
+    { value: "Musique", label: "Musique", icon: "🎵" },
+    { value: "Lifestyle", label: "Lifestyle", icon: "✨" }
+  ];
+
+  useEffect(() => {
+    if (activeTab === "patterns") {
+      loadPatterns();
+    }
+  }, [activeTab, selectedNiche]);
+
+  async function loadPatterns() {
+    setLoadingPatterns(true);
+    try {
+      const response = await fetch(`/api/patterns?action=recent&niche=${selectedNiche}&limit=50`);
+      const data = await response.json();
+      if (data.success) {
+        setPatterns(data);
+      }
+    } catch (err) {
+      console.error("Erreur chargement patterns:", err);
+    }
+    setLoadingPatterns(false);
+  }
+
+  async function handleAnalyze() {
+    setError("");
+    setResult(null);
+    if (!url) {
+      setError("Veuillez entrer une URL TikTok valide.");
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Erreur inconnue");
+      setResult(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const formatNumber = (num) => {
+    if (num === undefined || num === null) return "N/A";
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+    return num.toString();
+  };
+
+  const getEngagementColor = (rate) => {
+    if (rate > 10) return "viral";
+    if (rate > 5) return "excellent";
+    if (rate > 3) return "good";
+    if (rate > 1) return "average";
+    return "low";
+  };
+
+  return (
+    <>
+      <div className="app">
+        <nav className="nav">
+          <div className="nav-content">
+            <div className="logo">TikTok Analytics Pro</div>
+            <div className="nav-tabs">
+              <button 
+                className={`nav-tab ${activeTab === "analyze" ? "active" : ""}`}
+                onClick={() => setActiveTab("analyze")}
+              >
+                Analyser
+              </button>
+              <button 
+                className={`nav-tab ${activeTab === "patterns" ? "active" : ""}`}
+                onClick={() => setActiveTab("patterns")}
+              >
+                Patterns & Insights
+              </button>
+            </div>
+          </div>
+        </nav>
+
+        {/* Tab: Analyse */}
+        {activeTab === "analyze" && (
+          <div className="hero">
+            <div className="hero-content">
+              <h1 className="hero-title">
+                Analyse <span className="highlight">TikTok</span> avec IA
+              </h1>
+              <p className="hero-subtitle">
+                Intelligence artificielle pour décoder vos performances et découvrir les patterns viraux
+              </p>
+
+              <div className="input-section">
+                <div className="input-container">
+                  <input
+                    type="text"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="https://www.tiktok.com/@username/video/..."
+                    className="url-input"
+                  />
+                  <button
+                    onClick={handleAnalyze}
+                    disabled={loading}
+                    className="analyze-btn"
+                  >
+                    {loading ? (
+                      <>
+                        <div className="spinner"></div>
+                        <span>Analyse...</span>
+                      </>
+                    ) : (
+                      "Analyser"
+                    )}
+                  </button>
+                </div>
+                
+                {error && (
+                  <div className="error-message">⚠️ {error}</div>
+                )}
+              </div>
+
+              {result && (
+                <div className="results">
+                  {/* Thumbnail et info de base */}
+                  {result.thumbnail && (
+                    <div className="thumbnail-card">
+                      <img src={result.thumbnail} alt="Vidéo thumbnail" className="thumbnail-img"/>
+                      <div className="video-info">
+                        <div className="username">@{result.username || "unknown"}</div>
+                        <div className="niche-tag">{result.niche}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Performance Badge */}
+                  {result.metrics && (
+                    <div className={`performance-badge ${getEngagementColor(result.metrics.engagementRate)}`}>
+                      <div className="badge-label">Performance</div>
+                      <div className="badge-value">{result.metrics.performanceLevel}</div>
+                      <div className="badge-rate">{(result.metrics.engagementRate || 0).toFixed(1)}% d'engagement</div>
+                    </div>
+                  )}
+
+                  {/* Stats Grid */}
+                  <div className="stats-grid">
+                    <div className="stat-card">
+                      <div className="stat-icon">👁️</div>
+                      <div className="stat-number pink">{formatNumber(result.stats?.views)}</div>
+                      <div className="stat-label">Vues</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-icon">❤️</div>
+                      <div className="stat-number red">{formatNumber(result.stats?.likes)}</div>
+                      <div className="stat-label">Likes</div>
+                      <div className="stat-rate">{(result.stats?.likeRate || 0).toFixed(1)}%</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-icon">💬</div>
+                      <div className="stat-number blue">{formatNumber(result.stats?.comments)}</div>
+                      <div className="stat-label">Commentaires</div>
+                      <div className="stat-rate">{(result.stats?.commentRate || 0).toFixed(1)}%</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-icon">📤</div>
+                      <div className="stat-number green">{formatNumber(result.stats?.shares)}</div>
+                      <div className="stat-label">Partages</div>
+                      <div className="stat-rate">{(result.stats?.shareRate || 0).toFixed(1)}%</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-icon">📌</div>
+                      <div className="stat-number yellow">{formatNumber(result.stats?.saves)}</div>
+                      <div className="stat-label">Sauvegardes</div>
+                      <div className="stat-rate">{(result.stats?.saveRate || 0).toFixed(1)}%</div>
+                    </div>
+                  </div>
+
+                  {/* Hashtags */}
+                  {(result.hashtags?.length > 0) && (
+                    <div className="hashtags-card">
+                      <h3 className="section-title">Hashtags détectés</h3>
+                      <div className="hashtags-container">
+                        {result.hashtags.map((tag, index) => (
+                          <span key={index} className="hashtag-tag">{tag}</span>
+                        ))}
+                      </div>
+                    </div>
                   )}
 
                   {/* Description */}
@@ -12,32 +225,10 @@
                   {/* AI Recommendations */}
                   {result.advice && (
                     <div className="advice-card">
-                      <h3 className="section-title">🎯 Recommandations IA Personnalisées</h3>
+                      <h3 className="section-title">🎯 Recommandations IA</h3>
                       <div className="advice-content">
                         {result.advice}
                       </div>
-                    </div>
-                  )}
-
-                  {/* Predictions */}
-                  {result.predictions && (
-                    <div className="predictions-card">
-                      <h3 className="section-title">🔮 Prédictions & Potentiel</h3>
-                      <div className="predictions-content">
-                        {result.predictions}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Notices */}
-                  {(result.notices?.length > 0) && (
-                    <div className="notices-card">
-                      <h3 className="section-title">ℹ️ Remarques</h3>
-                      <ul className="notices-list">
-                        {result.notices.map((notice, index) => (
-                          <li key={index}>{notice}</li>
-                        ))}
-                      </ul>
                     </div>
                   )}
                 </div>
@@ -72,115 +263,52 @@
               </div>
             ) : patterns && (
               <div className="patterns-content">
-                {/* Stats aggregées */}
-                {patterns.aggregatedStats && (
-                  <div className="aggregated-stats">
-                    <div className="agg-stat">
-                      <div className="agg-value">{patterns.analysisCount}</div>
-                      <div className="agg-label">Vidéos analysées</div>
-                    </div>
-                    <div className="agg-stat">
-                      <div className="agg-value">{formatNumber(patterns.aggregatedStats.totalViews)}</div>
-                      <div className="agg-label">Vues totales</div>
-                    </div>
-                    <div className="agg-stat">
-                      <div className="agg-value">{patterns.aggregatedStats.avgEngagement?.toFixed(1) || 0}%</div>
-                      <div className="agg-label">Engagement moyen</div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Top Hashtags */}
-                {patterns.topHashtags && patterns.topHashtags.length > 0 && (
-                  <div className="top-hashtags-card">
-                    <h3>🏆 Top Hashtags</h3>
-                    <div className="hashtags-list">
-                      {patterns.topHashtags.map((item, i) => (
-                        <div key={i} className="hashtag-item">
-                          <span className="hashtag-rank">#{i+1}</span>
-                          <span className="hashtag-name">{item.tag}</span>
-                          <span className="hashtag-usage">Utilisé dans {item.percentage}% des vidéos</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Success vs Failure Patterns */}
-                <div className="patterns-comparison">
-                  {patterns.successPatterns && (
-                    <div className="pattern-card success">
-                      <h4>🚀 Patterns de succès (>5% engagement)</h4>
-                      <p><strong>Engagement moyen:</strong> {patterns.successPatterns.avgEngagement?.toFixed(1) || 0}%</p>
-                      <p><strong>Vues moyennes:</strong> {formatNumber(patterns.successPatterns.avgViews)}</p>
-                      {patterns.successPatterns.commonHashtags?.length > 0 && (
-                        <div>
-                          <p><strong>Hashtags communs:</strong></p>
-                          <div className="common-tags">
-                            {patterns.successPatterns.commonHashtags.map((tag, i) => (
-                              <span key={i} className="tag-badge">{tag}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {patterns.successPatterns.commonContentTypes?.length > 0 && (
-                        <div>
-                          <p><strong>Types de contenu:</strong></p>
-                          <ul>
-                            {patterns.successPatterns.commonContentTypes.map((type, i) => (
-                              <li key={i}>{type}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {patterns.failurePatterns && (
-                    <div className="pattern-card failure">
-                      <h4>📉 Patterns d'échec (<1% engagement)</h4>
-                      <p><strong>Engagement moyen:</strong> {patterns.failurePatterns.avgEngagement?.toFixed(1) || 0}%</p>
-                      <p><strong>Vues moyennes:</strong> {formatNumber(patterns.failurePatterns.avgViews)}</p>
-                      {patterns.failurePatterns.commonIssues?.length > 0 && (
-                        <div>
-                          <p><strong>Problèmes récurrents:</strong></p>
-                          <ul>
-                            {patterns.failurePatterns.commonIssues.map((issue, i) => (
-                              <li key={i}>{issue}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Recent Analyses */}
-                {patterns.recentAnalyses && patterns.recentAnalyses.length > 0 && (
-                  <div className="recent-analyses">
-                    <h3>📊 Analyses récentes</h3>
-                    <div className="analyses-list">
-                      {patterns.recentAnalyses.map((analysis, i) => (
-                        <div key={i} className="analysis-row">
-                          <span className="analysis-user">@{analysis.username}</span>
-                          <span className="analysis-views">{formatNumber(analysis.views)} vues</span>
-                          <span className={`analysis-engagement ${getEngagementColor(analysis.engagement)}`}>
-                            {analysis.engagement?.toFixed(1) || 0}% engagement
-                          </span>
-                          <span className="analysis-time">
-                            {new Date(analysis.timestamp).toLocaleDateString('fr-FR')}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {patterns.analysisCount === 0 && (
+                {patterns.analysisCount === 0 ? (
                   <div className="no-data-card">
                     <p>Aucune donnée disponible pour cette niche.</p>
-                    <p>Analysez des vidéos de cette catégorie pour commencer à voir des patterns!</p>
+                    <p>Analysez des vidéos de cette catégorie pour voir les patterns!</p>
                   </div>
+                ) : (
+                  <>
+                    {/* Stats aggregées */}
+                    {patterns.aggregatedStats && (
+                      <div className="aggregated-stats">
+                        <div className="agg-stat">
+                          <div className="agg-value">{patterns.analysisCount}</div>
+                          <div className="agg-label">Vidéos analysées</div>
+                        </div>
+                        <div className="agg-stat">
+                          <div className="agg-value">{formatNumber(patterns.aggregatedStats.totalViews)}</div>
+                          <div className="agg-label">Vues totales</div>
+                        </div>
+                        <div className="agg-stat">
+                          <div className="agg-value">{patterns.aggregatedStats.avgEngagement?.toFixed(1) || 0}%</div>
+                          <div className="agg-label">Engagement moyen</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Recent Analyses */}
+                    {patterns.recentAnalyses && patterns.recentAnalyses.length > 0 && (
+                      <div className="recent-analyses">
+                        <h3>📊 Analyses récentes</h3>
+                        <div className="analyses-list">
+                          {patterns.recentAnalyses.map((analysis, i) => (
+                            <div key={i} className="analysis-row">
+                              <span className="analysis-user">@{analysis.username}</span>
+                              <span className="analysis-views">{formatNumber(analysis.views)} vues</span>
+                              <span className={`analysis-engagement ${getEngagementColor(analysis.engagement)}`}>
+                                {analysis.engagement?.toFixed(1) || 0}% engagement
+                              </span>
+                              <span className="analysis-time">
+                                {new Date(analysis.timestamp).toLocaleDateString('fr-FR')}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -370,14 +498,14 @@
           margin: 0 auto;
         }
 
-        /* Thumbnail Card */
-        .thumbnail-card {
+        /* Cards */
+        .thumbnail-card, .performance-badge, .hashtags-card, .description-card, .advice-card {
           background: rgba(255, 255, 255, 0.1);
           backdrop-filter: blur(10px);
           border-radius: 1rem;
           padding: 1.5rem;
           margin-bottom: 2rem;
-          text-align: center;
+          border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .thumbnail-img {
@@ -406,15 +534,8 @@
           font-size: 0.875rem;
         }
 
-        /* Performance Badge */
         .performance-badge {
           display: inline-block;
-          background: rgba(255, 255, 255, 0.1);
-          backdrop-filter: blur(10px);
-          border-radius: 1rem;
-          padding: 1.5rem 3rem;
-          margin-bottom: 2rem;
-          border: 2px solid rgba(255, 255, 255, 0.2);
           text-align: center;
         }
 
@@ -458,189 +579,6 @@
         .badge-rate {
           font-size: 1rem;
           opacity: 0.9;
-        }
-
-        /* Analysis Card */
-        .analysis-card {
-          background: rgba(255, 255, 255, 0.1);
-          backdrop-filter: blur(10px);
-          border-radius: 1rem;
-          padding: 2rem;
-          margin-bottom: 2rem;
-          border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .section-title {
-          font-size: 1.25rem;
-          font-weight: 600;
-          margin-bottom: 1.5rem;
-          text-align: center;
-        }
-
-        .analysis-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-          gap: 1rem;
-          margin-bottom: 2rem;
-        }
-
-        .analysis-item {
-          display: flex;
-          justify-content: space-between;
-          padding: 0.5rem 0;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .analysis-label {
-          opacity: 0.7;
-        }
-
-        .analysis-value {
-          font-weight: 600;
-          color: #f472b6;
-        }
-
-        /* Quality Scores */
-        .quality-scores {
-          margin-top: 1.5rem;
-          padding-top: 1.5rem;
-          border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .quality-scores h4 {
-          margin-bottom: 1rem;
-          opacity: 0.9;
-        }
-
-        .score-item {
-          display: grid;
-          grid-template-columns: 80px 1fr 50px;
-          align-items: center;
-          gap: 1rem;
-          margin-bottom: 1rem;
-        }
-
-        .score-label {
-          font-size: 0.875rem;
-          opacity: 0.7;
-        }
-
-        .score-bar {
-          height: 8px;
-          background: rgba(255, 255, 255, 0.1);
-          border-radius: 4px;
-          overflow: hidden;
-        }
-
-        .score-fill {
-          height: 100%;
-          background: linear-gradient(90deg, #ec4899, #9333ea);
-          transition: width 0.5s ease;
-        }
-
-        .score-value {
-          text-align: right;
-          font-weight: 600;
-        }
-
-        /* Factors Grid */
-        .factors-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-          gap: 1rem;
-          margin-top: 1.5rem;
-        }
-
-        .factor-card {
-          background: rgba(255, 255, 255, 0.05);
-          border-radius: 0.75rem;
-          padding: 1.5rem;
-          border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .factor-card.success {
-          border-color: rgba(74, 222, 128, 0.5);
-          background: rgba(74, 222, 128, 0.05);
-        }
-
-        .factor-card.warning {
-          border-color: rgba(251, 191, 36, 0.5);
-          background: rgba(251, 191, 36, 0.05);
-        }
-
-        .factor-card h4 {
-          margin-bottom: 1rem;
-        }
-
-        .factor-card ul {
-          list-style: none;
-          padding: 0;
-        }
-
-        .factor-card li {
-          padding: 0.25rem 0;
-          opacity: 0.9;
-        }
-
-        /* Benchmark Card */
-        .benchmark-card {
-          background: rgba(255, 255, 255, 0.1);
-          backdrop-filter: blur(10px);
-          border-radius: 1rem;
-          padding: 2rem;
-          margin-bottom: 2rem;
-        }
-
-        .benchmark-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 1.5rem;
-        }
-
-        .benchmark-item {
-          text-align: center;
-        }
-
-        .benchmark-metric {
-          font-size: 0.875rem;
-          opacity: 0.7;
-          margin-bottom: 0.5rem;
-        }
-
-        .benchmark-values {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          gap: 1rem;
-          margin-bottom: 0.5rem;
-        }
-
-        .benchmark-values .current {
-          font-size: 1.25rem;
-          font-weight: bold;
-          color: #f472b6;
-        }
-
-        .benchmark-values .vs {
-          opacity: 0.5;
-        }
-
-        .benchmark-values .target {
-          font-size: 1.25rem;
-          opacity: 0.7;
-        }
-
-        .benchmark-indicator {
-          font-size: 0.875rem;
-          font-weight: 600;
-        }
-
-        .benchmark-indicator.positive {
-          color: #4ade80;
-        }
-
-        .benchmark-indicator.negative {
-          color: #f87171;
         }
 
         /* Stats Grid */
@@ -693,13 +631,10 @@
           margin-top: 0.25rem;
         }
 
-        /* Hashtags & Other Cards */
-        .hashtags-card, .description-card, .advice-card, .predictions-card, .notices-card {
-          background: rgba(255, 255, 255, 0.1);
-          backdrop-filter: blur(10px);
-          border-radius: 1rem;
-          padding: 2rem;
-          margin-bottom: 2rem;
+        .section-title {
+          font-size: 1.25rem;
+          font-weight: 600;
+          margin-bottom: 1rem;
         }
 
         .hashtags-container {
@@ -717,45 +652,16 @@
           font-size: 0.875rem;
         }
 
-        .hashtag-tag.recommended {
-          background: linear-gradient(90deg, rgba(74, 222, 128, 0.2), rgba(52, 211, 153, 0.2));
-          border-color: rgba(74, 222, 128, 0.5);
-        }
-
-        .missing-hashtags {
-          margin-top: 1rem;
-          padding-top: 1rem;
-          border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .missing-hashtags p {
-          margin-bottom: 0.5rem;
-          opacity: 0.9;
-        }
-
         .description-text {
           white-space: pre-wrap;
           line-height: 1.6;
           opacity: 0.9;
         }
 
-        .advice-content, .predictions-content {
+        .advice-content {
           white-space: pre-wrap;
           line-height: 1.6;
           opacity: 0.9;
-        }
-
-        .notices-list {
-          list-style: none;
-          padding: 0;
-        }
-
-        .notices-list li {
-          background: rgba(251, 191, 36, 0.1);
-          padding: 0.75rem;
-          border-radius: 0.5rem;
-          margin-bottom: 0.5rem;
-          border-left: 3px solid #fbbf24;
         }
 
         /* Patterns Section */
@@ -829,12 +735,10 @@
           gap: 2rem;
         }
 
-        /* Aggregated Stats */
         .aggregated-stats {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
           gap: 1rem;
-          margin-bottom: 2rem;
         }
 
         .agg-stat {
@@ -857,117 +761,7 @@
           opacity: 0.7;
         }
 
-        /* Top Hashtags */
-        .top-hashtags-card {
-          background: rgba(255, 255, 255, 0.1);
-          backdrop-filter: blur(10px);
-          border-radius: 1rem;
-          padding: 2rem;
-        }
-
-        .top-hashtags-card h3 {
-          margin-bottom: 1.5rem;
-        }
-
-        .hashtags-list {
-          display: grid;
-          gap: 0.75rem;
-        }
-
-        .hashtag-item {
-          display: grid;
-          grid-template-columns: 40px 1fr auto;
-          align-items: center;
-          padding: 0.75rem;
-          background: rgba(255, 255, 255, 0.05);
-          border-radius: 0.5rem;
-          transition: all 0.3s;
-        }
-
-        .hashtag-item:hover {
-          background: rgba(255, 255, 255, 0.1);
-        }
-
-        .hashtag-rank {
-          font-weight: bold;
-          color: #f472b6;
-        }
-
-        .hashtag-name {
-          font-size: 1rem;
-        }
-
-        .hashtag-usage {
-          background: linear-gradient(90deg, #ec4899, #9333ea);
-          padding: 0.25rem 0.75rem;
-          border-radius: 9999px;
-          font-size: 0.75rem;
-        }
-
-        /* Patterns Comparison */
-        .patterns-comparison {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-          gap: 1rem;
-        }
-
-        .pattern-card {
-          background: rgba(255, 255, 255, 0.1);
-          backdrop-filter: blur(10px);
-          border-radius: 1rem;
-          padding: 1.5rem;
-          border: 2px solid;
-        }
-
-        .pattern-card.success {
-          border-color: rgba(74, 222, 128, 0.5);
-        }
-
-        .pattern-card.failure {
-          border-color: rgba(248, 113, 113, 0.5);
-        }
-
-        .pattern-card h4 {
-          margin-bottom: 1rem;
-        }
-
-        .pattern-card p {
-          margin-bottom: 0.5rem;
-          opacity: 0.9;
-        }
-
-        .pattern-card strong {
-          color: #f472b6;
-        }
-
-        .common-tags {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.5rem;
-          margin-top: 0.5rem;
-        }
-
-        .tag-badge {
-          background: rgba(244, 114, 182, 0.2);
-          border: 1px solid rgba(244, 114, 182, 0.3);
-          padding: 0.25rem 0.5rem;
-          border-radius: 0.25rem;
-          font-size: 0.875rem;
-        }
-
-        .pattern-card ul {
-          list-style: none;
-          padding-left: 0;
-          margin-top: 0.5rem;
-        }
-
-        .pattern-card li {
-          padding: 0.25rem 0;
-          opacity: 0.9;
-        }
-
-        /* Recent Analyses */
-        .recent-analyses {
+        .recent-analyses, .no-data-card {
           background: rgba(255, 255, 255, 0.1);
           backdrop-filter: blur(10px);
           border-radius: 1rem;
@@ -991,25 +785,11 @@
           background: rgba(255, 255, 255, 0.05);
           border-radius: 0.5rem;
           font-size: 0.9rem;
-          transition: all 0.3s;
-        }
-
-        .analysis-row:hover {
-          background: rgba(255, 255, 255, 0.1);
         }
 
         .analysis-user {
           font-weight: 600;
           color: #f472b6;
-        }
-
-        .analysis-views {
-          text-align: center;
-        }
-
-        .analysis-engagement {
-          text-align: center;
-          font-weight: 600;
         }
 
         .analysis-engagement.viral { color: #f472b6; }
@@ -1023,14 +803,8 @@
           text-align: right;
         }
 
-        /* No Data Card */
         .no-data-card {
-          background: rgba(255, 255, 255, 0.1);
-          backdrop-filter: blur(10px);
-          border-radius: 1rem;
-          padding: 3rem;
           text-align: center;
-          border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .no-data-card p {
@@ -1056,387 +830,16 @@
             gap: 0.5rem;
           }
 
-          .nav-tabs {
-            width: 100%;
-            justify-content: center;
-          }
-
           .stats-grid {
             grid-template-columns: repeat(2, 1fr);
-          }
-
-          .benchmark-grid {
-            grid-template-columns: 1fr;
           }
 
           .analysis-row {
             grid-template-columns: 1fr;
             gap: 0.5rem;
-            text-align: left;
-          }
-
-          .analysis-row > * {
-            text-align: left !important;
-          }
-
-          .niche-selector {
-            max-height: 200px;
-            overflow-y: auto;
-            padding: 1rem;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 0.5rem;
-          }
-
-          .patterns-comparison {
-            grid-template-columns: 1fr;
           }
         }
       `}</style>
     </>
   );
-}// pages/index.js
-import { useState, useEffect } from "react";
-
-export default function Home() {
-  const [url, setUrl] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("analyze");
-  const [patterns, setPatterns] = useState(null);
-  const [loadingPatterns, setLoadingPatterns] = useState(false);
-  const [selectedNiche, setSelectedNiche] = useState("Humour");
-
-  const niches = [
-    { value: "Humour", label: "Humour", icon: "😂" },
-    { value: "Danse", label: "Danse", icon: "💃" },
-    { value: "Beauté/Mode", label: "Beauté/Mode", icon: "💄" },
-    { value: "Cuisine", label: "Cuisine", icon: "🍔" },
-    { value: "Fitness/Sport", label: "Fitness/Sport", icon: "💪" },
-    { value: "Éducation", label: "Éducation", icon: "📚" },
-    { value: "Tech", label: "Tech", icon: "💻" },
-    { value: "Gaming", label: "Gaming", icon: "🎮" },
-    { value: "Musique", label: "Musique", icon: "🎵" },
-    { value: "Lifestyle", label: "Lifestyle", icon: "✨" }
-  ];
-
-  useEffect(() => {
-    if (activeTab === "patterns") {
-      loadPatterns();
-    }
-  }, [activeTab, selectedNiche]);
-
-  async function loadPatterns() {
-    setLoadingPatterns(true);
-    try {
-      const response = await fetch(`/api/patterns?action=recent&niche=${selectedNiche}&limit=50`);
-      const data = await response.json();
-      if (data.success) {
-        setPatterns(data);
-      }
-    } catch (err) {
-      console.error("Erreur chargement patterns:", err);
-    }
-    setLoadingPatterns(false);
-  }
-
-  async function handleAnalyze() {
-    setError("");
-    setResult(null);
-    if (!url) {
-      setError("Veuillez entrer une URL TikTok valide.");
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      const response = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Erreur inconnue");
-      setResult(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const formatNumber = (num) => {
-    if (num === undefined || num === null) return "N/A";
-    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
-    return num.toString();
-  };
-
-  const getEngagementColor = (rate) => {
-    if (rate > 10) return "viral";
-    if (rate > 5) return "excellent";
-    if (rate > 3) return "good";
-    if (rate > 1) return "average";
-    return "low";
-  };
-
-  return (
-    <>
-      <div className="app">
-        <nav className="nav">
-          <div className="nav-content">
-            <div className="logo">TikTok Analytics Pro</div>
-            <div className="nav-tabs">
-              <button 
-                className={`nav-tab ${activeTab === "analyze" ? "active" : ""}`}
-                onClick={() => setActiveTab("analyze")}
-              >
-                Analyser
-              </button>
-              <button 
-                className={`nav-tab ${activeTab === "patterns" ? "active" : ""}`}
-                onClick={() => setActiveTab("patterns")}
-              >
-                Patterns & Insights
-              </button>
-            </div>
-          </div>
-        </nav>
-
-        {/* Tab: Analyse */}
-        {activeTab === "analyze" && (
-          <div className="hero">
-            <div className="hero-content">
-              <h1 className="hero-title">
-                Analyse <span className="highlight">TikTok</span> avec IA
-              </h1>
-              <p className="hero-subtitle">
-                Intelligence artificielle pour décoder vos performances et découvrir les patterns viraux
-              </p>
-
-              <div className="input-section">
-                <div className="input-container">
-                  <input
-                    type="text"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    placeholder="https://www.tiktok.com/@username/video/..."
-                    className="url-input"
-                  />
-                  <button
-                    onClick={handleAnalyze}
-                    disabled={loading}
-                    className="analyze-btn"
-                  >
-                    {loading ? (
-                      <>
-                        <div className="spinner"></div>
-                        <span>Analyse...</span>
-                      </>
-                    ) : (
-                      "Analyser"
-                    )}
-                  </button>
-                </div>
-                
-                {error && (
-                  <div className="error-message">⚠️ {error}</div>
-                )}
-              </div>
-
-              {result && (
-                <div className="results">
-                  {/* Thumbnail et info de base */}
-                  {result.thumbnail && (
-                    <div className="thumbnail-card">
-                      <img src={result.thumbnail} alt="Vidéo thumbnail" className="thumbnail-img"/>
-                      <div className="video-info">
-                        <div className="username">@{result.username || "unknown"}</div>
-                        <div className="niche-tag">{result.niche}</div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Performance Badge */}
-                  {result.metrics && (
-                    <div className={`performance-badge ${getEngagementColor(result.metrics.engagementRate)}`}>
-                      <div className="badge-label">Performance</div>
-                      <div className="badge-value">{result.metrics.performanceLevel}</div>
-                      <div className="badge-rate">{(result.metrics.engagementRate || 0).toFixed(1)}% d'engagement</div>
-                    </div>
-                  )}
-
-                  {/* Analyse IA détaillée */}
-                  {result.analysis && (
-                    <div className="analysis-card">
-                      <h3 className="section-title">🤖 Analyse IA Détaillée</h3>
-                      <div className="analysis-grid">
-                        <div className="analysis-item">
-                          <span className="analysis-label">Type de contenu:</span>
-                          <span className="analysis-value">{result.analysis.contentType || "Non identifié"}</span>
-                        </div>
-                        <div className="analysis-item">
-                          <span className="analysis-label">Sous-niche:</span>
-                          <span className="analysis-value">{result.analysis.subNiche || "Non identifiée"}</span>
-                        </div>
-                        {result.analysis.audienceProfile && (
-                          <div className="analysis-item">
-                            <span className="analysis-label">Audience cible:</span>
-                            <span className="analysis-value">
-                              {result.analysis.audienceProfile.ageRange}, {result.analysis.audienceProfile.primaryGender}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Quality Scores */}
-                      {result.analysis.contentQuality && (
-                        <div className="quality-scores">
-                          <h4>Scores de qualité</h4>
-                          <div className="score-item">
-                            <div className="score-label">Hook</div>
-                            <div className="score-bar">
-                              <div className="score-fill" style={{width: `${result.analysis.contentQuality.hook * 10}%`}}></div>
-                            </div>
-                            <div className="score-value">{result.analysis.contentQuality.hook}/10</div>
-                          </div>
-                          <div className="score-item">
-                            <div className="score-label">Rétention</div>
-                            <div className="score-bar">
-                              <div className="score-fill" style={{width: `${result.analysis.contentQuality.retention * 10}%`}}></div>
-                            </div>
-                            <div className="score-value">{result.analysis.contentQuality.retention}/10</div>
-                          </div>
-                          <div className="score-item">
-                            <div className="score-label">CTA</div>
-                            <div className="score-bar">
-                              <div className="score-fill" style={{width: `${result.analysis.contentQuality.cta * 10}%`}}></div>
-                            </div>
-                            <div className="score-value">{result.analysis.contentQuality.cta}/10</div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Viral Factors & Weak Points */}
-                      <div className="factors-grid">
-                        {result.analysis.viralFactors && result.analysis.viralFactors.length > 0 && (
-                          <div className="factor-card success">
-                            <h4>✅ Facteurs de succès</h4>
-                            <ul>
-                              {result.analysis.viralFactors.map((factor, i) => (
-                                <li key={i}>{factor}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        {result.analysis.weakPoints && result.analysis.weakPoints.length > 0 && (
-                          <div className="factor-card warning">
-                            <h4>⚠️ Points d'amélioration</h4>
-                            <ul>
-                              {result.analysis.weakPoints.map((point, i) => (
-                                <li key={i}>{point}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Comparaison Benchmarks */}
-                  {result.benchmarks && (
-                    <div className="benchmark-card">
-                      <h3 className="section-title">📊 VS Benchmarks {result.niche}</h3>
-                      <div className="benchmark-grid">
-                        <div className="benchmark-item">
-                          <div className="benchmark-metric">Engagement</div>
-                          <div className="benchmark-values">
-                            <span className="current">{(result.metrics?.engagementRate || 0).toFixed(1)}%</span>
-                            <span className="vs">vs</span>
-                            <span className="target">{result.benchmarks.engagement}%</span>
-                          </div>
-                          <div className={`benchmark-indicator ${(result.metrics?.engagementRate || 0) > result.benchmarks.engagement ? 'positive' : 'negative'}`}>
-                            {(result.metrics?.engagementRate || 0) > result.benchmarks.engagement ? '↑' : '↓'} 
-                            {Math.abs((result.metrics?.engagementRate || 0) - result.benchmarks.engagement).toFixed(1)}%
-                          </div>
-                        </div>
-                        <div className="benchmark-item">
-                          <div className="benchmark-metric">Likes</div>
-                          <div className="benchmark-values">
-                            <span className="current">{(result.metrics?.likeRate || 0).toFixed(1)}%</span>
-                            <span className="vs">vs</span>
-                            <span className="target">{result.benchmarks.likes}%</span>
-                          </div>
-                        </div>
-                        <div className="benchmark-item">
-                          <div className="benchmark-metric">Commentaires</div>
-                          <div className="benchmark-values">
-                            <span className="current">{(result.metrics?.commentRate || 0).toFixed(1)}%</span>
-                            <span className="vs">vs</span>
-                            <span className="target">{result.benchmarks.comments}%</span>
-                          </div>
-                        </div>
-                        <div className="benchmark-item">
-                          <div className="benchmark-metric">Partages</div>
-                          <div className="benchmark-values">
-                            <span className="current">{(result.metrics?.shareRate || 0).toFixed(1)}%</span>
-                            <span className="vs">vs</span>
-                            <span className="target">{result.benchmarks.shares}%</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Stats Grid */}
-                  <div className="stats-grid">
-                    <div className="stat-card">
-                      <div className="stat-icon">👁️</div>
-                      <div className="stat-number pink">{formatNumber(result.stats?.views)}</div>
-                      <div className="stat-label">Vues</div>
-                    </div>
-                    <div className="stat-card">
-                      <div className="stat-icon">❤️</div>
-                      <div className="stat-number red">{formatNumber(result.stats?.likes)}</div>
-                      <div className="stat-label">Likes</div>
-                      <div className="stat-rate">{(result.stats?.likeRate || 0).toFixed(1)}%</div>
-                    </div>
-                    <div className="stat-card">
-                      <div className="stat-icon">💬</div>
-                      <div className="stat-number blue">{formatNumber(result.stats?.comments)}</div>
-                      <div className="stat-label">Commentaires</div>
-                      <div className="stat-rate">{(result.stats?.commentRate || 0).toFixed(1)}%</div>
-                    </div>
-                    <div className="stat-card">
-                      <div className="stat-icon">📤</div>
-                      <div className="stat-number green">{formatNumber(result.stats?.shares)}</div>
-                      <div className="stat-label">Partages</div>
-                      <div className="stat-rate">{(result.stats?.shareRate || 0).toFixed(1)}%</div>
-                    </div>
-                    <div className="stat-card">
-                      <div className="stat-icon">📌</div>
-                      <div className="stat-number yellow">{formatNumber(result.stats?.saves)}</div>
-                      <div className="stat-label">Sauvegardes</div>
-                      <div className="stat-rate">{(result.stats?.saveRate || 0).toFixed(1)}%</div>
-                    </div>
-                  </div>
-
-                  {/* Hashtags */}
-                  {(result.hashtags?.length > 0) && (
-                    <div className="hashtags-card">
-                      <h3 className="section-title">Hashtags détectés</h3>
-                      <div className="hashtags-container">
-                        {result.hashtags.map((tag, index) => (
-                          <span key={index} className="hashtag-tag">{tag}</span>
-                        ))}
-                      </div>
-                      {result.analysis?.hashtagAnalysis?.missing && (
-                        <div className="missing-hashtags">
-                          <p>💡 Hashtags recommandés:</p>
-                          <div className="hashtags-container">
-                            {result.analysis.hashtagAnalysis.missing.map((tag, i) => (
-                              <span key={i} className="hashtag-tag recommended">{tag}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+}
