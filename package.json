@@ -13,6 +13,7 @@
     "react-dom": "18.3.1",
     "@vercel/kv": "^1.0.1",
     "openai": "4.58.1",
-    "cheerio": "^1.0.0-rc.12"
+    "cheerio": "^1.0.0-rc.12",
+    "scrapingbee": "^1.8.0"
   }
 }
