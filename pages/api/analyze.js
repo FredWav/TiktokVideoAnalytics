@@ -1,6 +1,6 @@
 // pages/api/analyze.js
 import OpenAI from "openai";
-import ScrapingBeeClient from 'scrapingbee'; // Import correct
+import { ScrapingBeeClient } from 'scrapingbee'; // Import correct avec destructuring
 import { extractFromHtml, computeRates } from '@/lib/extract';
 import { inferNiche } from '@/lib/niche';
 import { saveVideoAnalysis } from '@/lib/database';
