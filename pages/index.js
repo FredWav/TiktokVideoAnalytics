@@ -1,84 +1,195 @@
-import { useState } from 'react';
+import { useState } from "react";
 
 export default function Home() {
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [result, setResult] = useState(null);
-  const [darkMode, setDarkMode] = useState(false);
+  const [res, setRes] = useState(null);
+  const [err, setErr] = useState("");
+  const [dark, setDark] = useState(false);
 
   async function handleAnalyze() {
-    setError('');
-    setResult(null);
-    if (!url) {
-      setError("Merci d'entrer l'URL d'une vidéo TikTok.");
-      return;
-    }
-    setLoading(true);
+    setErr("");
+    setRes(null);
+    if (!url) return setErr("Colle une URL TikTok publique.");
     try {
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url })
+      setLoading(true);
+      const r = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erreur inconnue');
-      setResult(data);
-    } catch (err) {
-      setError(err.message);
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error || "Erreur inconnue");
+      setRes(json);
+    } catch (e) {
+      setErr(e.message);
     } finally {
       setLoading(false);
     }
   }
 
+  const cx = (...c) => c.filter(Boolean).join(" ");
+  const box = "rounded-2xl p-4 border";
+
   return (
-    <div className={darkMode ? 'dark' : ''} style={{ minHeight: '100vh', backgroundColor: darkMode ? '#1a202c' : '#f7fafc', color: darkMode ? '#f7fafc' : '#2d3748', fontFamily: 'Arial, sans-serif', padding: '2rem' }}>
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-          <h1 style={{ fontSize: '2rem', margin: 0 }}>Analyseur TikTok</h1>
-          <button onClick={() => setDarkMode(!darkMode)} style={{ padding: '0.5rem 1rem', borderRadius: '0.375rem', border: 'none', cursor: 'pointer', backgroundColor: darkMode ? '#2d3748' : '#e2e8f0', color: darkMode ? '#e2e8f0' : '#2d3748' }}>
-            {darkMode ? 'Thème clair' : 'Thème sombre'}
-          </button>
-        </header>
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-          <input
-            type="text"
-            placeholder="Colle l'URL de la vidéo TikTok"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            style={{ flex: 1, padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid', borderColor: darkMode ? '#4a5568' : '#cbd5e0', backgroundColor: darkMode ? '#2d3748' : '#fff', color: darkMode ? '#f7fafc' : '#2d3748' }}
-          />
+    <div
+      className={cx(
+        "min-h-screen",
+        dark ? "bg-[#0f1115] text-white" : "bg-white text-[#0f1115]"
+      )}
+      style={{ fontFamily: "Inter, ui-sans-serif, system-ui" }}
+    >
+      <div className="max-w-3xl mx-auto p-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Analyse vidéo TikTok</h1>
           <button
-            onClick={handleAnalyze}
-            style={{ padding: '0.75rem 1rem', borderRadius: '0.375rem', border: 'none', backgroundColor: '#3182ce', color: '#fff', cursor: 'pointer' }}
+            onClick={() => setDark((d) => !d)}
+            className="text-sm opacity-70 hover:opacity-100"
           >
-            {loading ? 'Analyse…' : 'Analyser'}
+            {dark ? "Mode clair" : "Mode sombre"}
           </button>
         </div>
-        {error && <p style={{ color: '#e53e3e' }}>{error}</p>}
-        {result && (
-          <section style={{ marginTop: '2rem', backgroundColor: darkMode ? '#2d3748' : '#edf2f7', padding: '1.5rem', borderRadius: '0.5rem' }}>
-            <h2 style={{ marginTop: 0 }}>Résultats</h2>
-            <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
-              <li>Vues : {result.data.views}</li>
-              <li>Likes : {result.data.likes}</li>
-              <li>Commentaires : {result.data.comments}</li>
-              <li>Partages : {result.data.shares}</li>
-              <li>Enregistrements : {result.data.collects}</li>
-              <li>Taux d’engagement : {result.engagementRate}%</li>
-              <li>Taux de likes : {result.likeRate}%</li>
-              <li>Taux de commentaires : {result.commentRate}%</li>
-              <li>Taux de partages : {result.shareRate}%</li>
-            </ul>
-            {result.advice && (
-              <div style={{ marginTop: '1rem' }}>
-                <h3>Conseils</h3>
-                <p style={{ whiteSpace: 'pre-line' }}>{result.advice}</p>
-              </div>
-            )}
-          </section>
+
+        <div
+          className={cx(
+            box,
+            dark ? "border-zinc-800 bg-black/20" : "border-zinc-200 bg-white/60",
+            "mt-6"
+          )}
+        >
+          <div className="flex gap-2">
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="Colle l’URL de la vidéo TikTok…"
+              className={cx(
+                "flex-1 px-3 py-2 rounded-lg outline-none",
+                dark ? "bg-zinc-900 border border-zinc-800" : "bg-white border border-zinc-300"
+              )}
+            />
+            <button
+              onClick={handleAnalyze}
+              disabled={loading}
+              className={cx(
+                "px-4 py-2 rounded-lg font-medium",
+                dark ? "bg-white text-black" : "bg-black text-white",
+                loading && "opacity-60 cursor-not-allowed"
+              )}
+            >
+              {loading ? "Analyse…" : "Analyser"}
+            </button>
+          </div>
+          {err && <p className="mt-3 text-red-500 text-sm">{err}</p>}
+        </div>
+
+        {res && (
+          <div className="grid md:grid-cols-2 gap-4 mt-6">
+            <div
+              className={cx(
+                box,
+                dark ? "border-zinc-800 bg-black/20" : "border-zinc-200 bg-white/60"
+              )}
+            >
+              <h2 className="font-semibold mb-2">Statistiques</h2>
+              <ul className="space-y-1 text-sm">
+                <li>Vues : {res.data.views.toLocaleString()}</li>
+                <li>Likes : {res.data.likes.toLocaleString()}</li>
+                <li>Commentaires : {res.data.comments.toLocaleString()}</li>
+                <li>Partages : {res.data.shares.toLocaleString()}</li>
+                <li>Enregistrements : {res.data.saves.toLocaleString()}</li>
+                <li className="mt-2">
+                  Hashtags : {res.data.hashtags.join(" ") || "–"}
+                </li>
+              </ul>
+            </div>
+            <div
+              className={cx(
+                box,
+                dark ? "border-zinc-800 bg-black/20" : "border-zinc-200 bg-white/60"
+              )}
+            >
+              <h2 className="font-semibold mb-2">Taux</h2>
+              <ul className="space-y-1 text-sm">
+                <li>
+                  Engagement global : {res.metrics.engagementRate.toFixed(2)}%
+                </li>
+                <li>Likes/Vues : {res.metrics.likeRate.toFixed(2)}%</li>
+                <li>
+                  Commentaires/Vues : {res.metrics.commentRate.toFixed(2)}%
+                </li>
+                <li>
+                  Partages/Vues : {res.metrics.shareRate.toFixed(2)}%
+                </li>
+                <li>
+                  Enregistrements/Vues : {res.metrics.saveRate.toFixed(2)}%
+                </li>
+              </ul>
+            </div>
+            <div
+              className={cx(
+                box,
+                "md:col-span-2",
+                dark ? "border-zinc-800 bg-black/20" : "border-zinc-200 bg-white/60"
+              )}
+            >
+              <h2 className="font-semibold mb-2">Conseils</h2>
+              <pre className="text-sm whitespace-pre-wrap leading-relaxed opacity-90">
+                {res.advice}
+              </pre>
+            </div>
+          </div>
         )}
       </div>
+
+      {/* styles tailwind-like minimal */}
+      <style jsx global>{`
+        * {
+          box-sizing: border-box;
+        }
+        .rounded-2xl {
+          border-radius: 1rem;
+        }
+        .border {
+          border-width: 1px;
+        }
+        .p-4 {
+          padding: 1rem;
+        }
+        .p-6 {
+          padding: 1.5rem;
+        }
+        .mt-6 {
+          margin-top: 1.5rem;
+        }
+        .mb-2 {
+          margin-bottom: 0.5rem;
+        }
+        .grid {
+          display: grid;
+        }
+        .gap-4 {
+          gap: 1rem;
+        }
+        .max-w-3xl {
+          max-width: 48rem;
+        }
+        .mx-auto {
+          margin-left: auto;
+          margin-right: auto;
+        }
+        .flex {
+          display: flex;
+        }
+        .items-center {
+          align-items: center;
+        }
+        .justify-between {
+          justify-content: space-between;
+        }
+        .space-y-1 > :not([hidden]) ~ :not([hidden]) {
+          margin-top: 0.25rem;
+        }
+      `}</style>
     </div>
   );
 }

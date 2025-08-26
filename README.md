@@ -1,34 +1,22 @@
-# TikTok Video Analytics (Prototype)
+# TikTok Video Analytics
 
-Ce projet constitue un prototype d'application Next.js destiné à analyser des vidéos TikTok.  
-Il fournit une base prête à déployer sur Vercel sans configuration locale.  
+Ce projet est une application Next.js déployée sur Vercel qui permet d’analyser les statistiques d’une vidéo TikTok sans utiliser l’API officielle. Vous collez l’URL d’une vidéo, l’application extrait les vues, likes, commentaires, partages et enregistrements via un parseur du HTML, calcule les taux d’engagement et sollicite ChatGPT pour générer des recommandations.
 
-## Fonctionnalités principales
+## Structure
 
-* Interface simple (page d'accueil) permettant à l'utilisateur de coller l'URL d'une vidéo TikTok et de lancer son analyse.
-* Route API (`/api/analyze`) recevant l'URL et interrogeant l'API OpenAI pour générer des conseils personnalisés en fonction de l'URL.  
-  Vous devrez enrichir cette fonction pour intégrer le scraping des statistiques réelles (vues, likes, commentaires, partages) et calculer les taux d'engagement.
-* Gestion de la clé OpenAI via les variables d'environnement (à définir sur Vercel).
+- **package.json** : définit les dépendances (Next.js, React, OpenAI) et les scripts de build.
+- **next.config.js** : configuration Next.js minimale.
+- **lib/scrape.js** : contient la fonction de scraping pour extraire les statistiques de la page TikTok.
+- **pages/api/analyze.js** : API route qui scrape, calcule les métriques et appelle OpenAI pour obtenir des conseils.
+- **pages/index.js** : interface utilisateur simple en React/Next.js, avec modes clair et sombre.
 
-## Structure du dépôt
+## Déploiement
 
-```
-tiktok-video-analytics/
-├── lib/
-│   └── scrape.js          # fonctions de scraping (à compléter)
-├── pages/
-│   ├── api/
-│   │   └── analyze.js     # route API qui interroge OpenAI
-│   └── index.js           # page d'accueil avec formulaire
-├── public/
-├── README.md
-└── package.json
-```
+1. Configurez la variable d’environnement `OPENAI_API_KEY` dans Vercel (Production et Preview).
+2. Déployez le projet sur Vercel : Vercel détecte automatiquement Next.js et construit l’app.
+3. Copiez l’URL d’une vidéo TikTok publique et collez-la dans l’interface pour lancer l’analyse.
 
-## Déploiement sur Vercel
+## Notes
 
-1. **Créer un dépôt GitHub** et y copier le contenu de ce dossier.  
-2. **Définir la variable d'environnement** `OPENAI_API_KEY` dans le tableau **Environment Variables** de Vercel (section Settings → Environment Variables).  
-3. **Importer le dépôt sur Vercel** et sélectionner le preset **Next.js**. Vercel détectera automatiquement `next build` et générera le site.
-
-Après déploiement, toute modification poussée sur la branche principale déclenchera une nouvelle construction et mise à jour du site.
+- Ce projet se base sur les données publiques intégrées dans les pages TikTok. Les vidéos privées ou restreintes peuvent ne pas fonctionner.
+- Pour des besoins de scraping intensif, envisagez de déporter la logique Playwright/Puppeteer vers un worker dédié.
