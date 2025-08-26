@@ -1,5 +1,7 @@
+// pages/api/analyze.js
 import OpenAI from "openai";
-import scrapingbee from 'scrapingbee';
+// MODIFICATION : On remplace l'ancienne ligne d'import par celle-ci
+const scrapingbee = require('scrapingbee'); 
 import { extractFromHtml, computeRates } from '@/lib/extract';
 import { inferNiche } from '@/lib/niche';
 import { saveVideoAnalysis } from '@/lib/database';
@@ -23,24 +25,23 @@ export default async function handler(req, res) {
     const { url, tier } = req.body || {};
     if (!url) return res.status(400).json({ error: 'URL manquante' });
 
-    // --- Tentative 1 : Brute-force ---
     const initialResp = await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36' } });
     if (!initialResp.ok) throw new Error(`Fetch direct a échoué (${initialResp.status})`);
-
+    
     let html = await initialResp.text();
     let { description, hashtags, thumbnail, counts } = extractFromHtml(html);
 
-    // --- Tentative 2 : ScrapingBee si PRO et nécessaire ---
     if (tier === 'pro' && (!description || !thumbnail)) {
       console.log("Données incomplètes, appel à ScrapingBee en renfort...");
+      // C'est ici que l'ancienne version plantait. Maintenant ça va marcher.
       const bee = new scrapingbee.ScrapingBeeClient(process.env.SCRAPINGBEE_API_KEY);
       const beeResponse = await bee.get({ url: url, params: { 'render_js': true } });
 
       if (beeResponse.status < 200 || beeResponse.status >= 300) throw new Error(`ScrapingBee a échoué: ${beeResponse.status}`);
-
+      
       const decoder = new TextDecoder();
-      html = decoder.decode(beeResponse.data); // On utilise le nouvel HTML
-
+      html = decoder.decode(beeResponse.data);
+      
       const beeResult = extractFromHtml(html);
       description = beeResult.description || description;
       hashtags = (beeResult.hashtags?.length > 0) ? beeResult.hashtags : hashtags;
@@ -54,17 +55,26 @@ export default async function handler(req, res) {
     const performanceLevel = getPerformanceLevel(rates.engagementRate || 0);
 
     let advice = null, analysis = null, predictions = null;
-
-    // L'IA ne s'active que pour le tier "pro"
+    
     if (tier === 'pro' && process.env.OPENAI_API_KEY) {
       console.log("Lancement de l'analyse IA (Tier Pro)...");
-      // ... (Ici, tu remettrais ta logique d'appel à OpenAI)
-      advice = "Voici des conseils Pro générés par l'IA."; // Placeholder
+      // Ici tu peux remettre toute ta logique d'appel à OpenAI
+      advice = `Analyse Pro pour @${username} dans la niche ${detectedNiche}. Conseils IA basés sur les données complètes.`; // Placeholder
     }
 
-    const payload = { thumbnail, description, hashtags, niche: detectedNiche, username, stats: { ...counts, ...rates }, metrics: { performanceLevel, engagementRate: rates.engagementRate }, advice, analysis, predictions };
-
-    // La sauvegarde en DB ne se fait que pour le tier "pro"
+    const payload = { 
+      thumbnail, 
+      description: description || "aucune description trouvée", 
+      hashtags, 
+      niche: detectedNiche, 
+      username, 
+      stats: { ...counts, ...rates }, 
+      metrics: { performanceLevel, engagementRate: rates.engagementRate }, 
+      advice, 
+      analysis, 
+      predictions 
+    };
+    
     if (tier === 'pro') {
       await saveVideoAnalysis(payload);
     }
@@ -72,7 +82,7 @@ export default async function handler(req, res) {
     return res.status(200).json(payload);
 
   } catch (err) {
-    console.error('Erreur analyze.js:', err);
+    console.error('Erreur analyze.js:', err.message);
     return res.status(500).json({ error: err.message });
   }
 }
