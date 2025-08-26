@@ -61,7 +61,7 @@ export default function Home() {
             <input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="Colle l’URL de la vidéo TikTok…"
+              placeholder="Colle l'URL de la vidéo TikTok…"
               className={cx(
                 "flex-1 px-3 py-2 rounded-lg outline-none",
                 dark ? "bg-zinc-900 border border-zinc-800" : "bg-white border border-zinc-300"
@@ -141,13 +141,15 @@ export default function Home() {
         )}
       </div>
 
-      {/* styles tailwind-like minimal */}
       <style jsx global>{`
         * {
           box-sizing: border-box;
         }
         .rounded-2xl {
           border-radius: 1rem;
+        }
+        .rounded-lg {
+          border-radius: 0.5rem;
         }
         .border {
           border-width: 1px;
@@ -158,14 +160,35 @@ export default function Home() {
         .p-6 {
           padding: 1.5rem;
         }
+        .px-3 {
+          padding-left: 0.75rem;
+          padding-right: 0.75rem;
+        }
+        .py-2 {
+          padding-top: 0.5rem;
+          padding-bottom: 0.5rem;
+        }
+        .px-4 {
+          padding-left: 1rem;
+          padding-right: 1rem;
+        }
         .mt-6 {
           margin-top: 1.5rem;
+        }
+        .mt-3 {
+          margin-top: 0.75rem;
+        }
+        .mt-2 {
+          margin-top: 0.5rem;
         }
         .mb-2 {
           margin-bottom: 0.5rem;
         }
         .grid {
           display: grid;
+        }
+        .gap-2 {
+          gap: 0.5rem;
         }
         .gap-4 {
           gap: 1rem;
@@ -180,6 +203,9 @@ export default function Home() {
         .flex {
           display: flex;
         }
+        .flex-1 {
+          flex: 1;
+        }
         .items-center {
           align-items: center;
         }
@@ -188,6 +214,91 @@ export default function Home() {
         }
         .space-y-1 > :not([hidden]) ~ :not([hidden]) {
           margin-top: 0.25rem;
+        }
+        .text-2xl {
+          font-size: 1.5rem;
+          line-height: 2rem;
+        }
+        .text-sm {
+          font-size: 0.875rem;
+          line-height: 1.25rem;
+        }
+        .font-bold {
+          font-weight: 700;
+        }
+        .font-semibold {
+          font-weight: 600;
+        }
+        .font-medium {
+          font-weight: 500;
+        }
+        .opacity-70 {
+          opacity: 0.7;
+        }
+        .opacity-60 {
+          opacity: 0.6;
+        }
+        .opacity-90 {
+          opacity: 0.9;
+        }
+        .hover\\:opacity-100:hover {
+          opacity: 1;
+        }
+        .cursor-not-allowed {
+          cursor: not-allowed;
+        }
+        .outline-none {
+          outline: none;
+        }
+        .whitespace-pre-wrap {
+          white-space: pre-wrap;
+        }
+        .leading-relaxed {
+          line-height: 1.625;
+        }
+        .min-h-screen {
+          min-height: 100vh;
+        }
+        .bg-white {
+          background-color: white;
+        }
+        .bg-black {
+          background-color: black;
+        }
+        .text-white {
+          color: white;
+        }
+        .text-black {
+          color: black;
+        }
+        .text-red-500 {
+          color: #ef4444;
+        }
+        .bg-zinc-900 {
+          background-color: #18181b;
+        }
+        .border-zinc-800 {
+          border-color: #27272a;
+        }
+        .border-zinc-200 {
+          border-color: #e4e4e7;
+        }
+        .border-zinc-300 {
+          border-color: #d4d4d8;
+        }
+        .bg-black\\/20 {
+          background-color: rgba(0, 0, 0, 0.2);
+        }
+        .bg-white\\/60 {
+          background-color: rgba(255, 255, 255, 0.6);
+        }
+        @media (min-width: 768px) {
+          .md\\:grid-cols-2 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+          .md\\:col-span-2 {
+            grid-column: span 2 / span 2;
+          }
         }
       `}</style>
     </div>
