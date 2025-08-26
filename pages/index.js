@@ -32,8 +32,6 @@ export default function Home() {
   async function loadPatterns() {
     setLoadingPatterns(true);
     try {
-      // Note: l'API patterns que tu as créée est très complexe. 
-      // Ici on utilise juste une de ses fonctions pour l'exemple.
       const response = await fetch(`/api/patterns?action=recent&niche=${selectedNiche}&limit=50`);
       const data = await response.json();
       if (data.success) {
@@ -48,7 +46,7 @@ export default function Home() {
     setLoadingPatterns(false);
   }
 
-  async function handleAnalyze() {
+  async function handleAnalyze(tier = 'free') {
     setError("");
     setResult(null);
     if (!url) {
@@ -61,7 +59,7 @@ export default function Home() {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, tier }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Erreur inconnue");
@@ -88,9 +86,8 @@ export default function Home() {
     return "low";
   };
   
-  // Fonction pour afficher le JSON de l'analyse IA
   const renderAiAnalysis = (analysis) => {
-    if (!analysis) return <p>Analyse IA non disponible.</p>;
+    if (!analysis) return <p>Analyse IA non disponible pour le tier gratuit.</p>;
     return (
       <ul className="ai-list">
         <li><strong>Sous-niche :</strong> {analysis.subNiche}</li>
@@ -108,18 +105,8 @@ export default function Home() {
           <div className="nav-content">
             <div className="logo">TikTok Analytics Pro</div>
             <div className="nav-tabs">
-              <button 
-                className={`nav-tab ${activeTab === "analyze" ? "active" : ""}`}
-                onClick={() => setActiveTab("analyze")}
-              >
-                Analyser
-              </button>
-              <button 
-                className={`nav-tab ${activeTab === "patterns" ? "active" : ""}`}
-                onClick={() => setActiveTab("patterns")}
-              >
-                Patterns & Insights
-              </button>
+              <button className={`nav-tab ${activeTab === "analyze" ? "active" : ""}`} onClick={() => setActiveTab("analyze")}>Analyser</button>
+              <button className={`nav-tab ${activeTab === "patterns" ? "active" : ""}`} onClick={() => setActiveTab("patterns")}>Patterns & Insights</button>
             </div>
           </div>
         </nav>
@@ -127,26 +114,23 @@ export default function Home() {
         {activeTab === "analyze" && (
           <div className="hero">
             <div className="hero-content">
-              <h1 className="hero-title">
-                Analyse <span className="highlight">TikTok</span> avec IA
-              </h1>
-              <p className="hero-subtitle">
-                Intelligence artificielle pour décoder vos performances et découvrir les patterns viraux.
-              </p>
+              <h1 className="hero-title">Analyse <span className="highlight">TikTok</span> avec IA</h1>
+              <p className="hero-subtitle">Intelligence artificielle pour décoder vos performances et découvrir les patterns viraux.</p>
 
               <div className="input-section">
                 <div className="input-container">
-                  <input
-                    type="text"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    placeholder="https://www.tiktok.com/@username/video/..."
-                    className="url-input"
-                  />
-                  <button onClick={handleAnalyze} disabled={loading} className="analyze-btn">
-                    {loading ? <><div className="spinner"></div><span>Analyse...</span></> : "Analyser"}
+                  <input type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://www.tiktok.com/@username/video/..." className="url-input" />
+                </div>
+                
+                <div className="analyze-buttons-container">
+                  <button onClick={() => handleAnalyze('free')} disabled={loading} className="analyze-btn free">
+                    {loading ? <div className="spinner"></div> : 'Analyse Basique'}
+                  </button>
+                  <button onClick={() => handleAnalyze('pro')} disabled={loading} className="analyze-btn pro">
+                    {loading ? <div className="spinner"></div> : '✨ Analyse Pro (IA)'}
                   </button>
                 </div>
+
                 {error && <div className="error-message">⚠️ {error}</div>}
               </div>
 
@@ -162,7 +146,7 @@ export default function Home() {
                     </div>
                   )}
 
-                  {result.metrics && (
+                  {result.metrics?.performanceLevel && (
                     <div className={`performance-badge ${getEngagementColor(result.metrics.engagementRate)}`}>
                       <div className="badge-label">Performance</div>
                       <div className="badge-value">{result.metrics.performanceLevel}</div>
@@ -171,71 +155,18 @@ export default function Home() {
                   )}
 
                   <div className="stats-grid">
-                    <div className="stat-card">
-                      <div className="stat-icon">👁️</div>
-                      <div className="stat-number pink">{formatNumber(result.stats?.views)}</div>
-                      <div className="stat-label">Vues</div>
-                    </div>
-                    <div className="stat-card">
-                      <div className="stat-icon">❤️</div>
-                      <div className="stat-number red">{formatNumber(result.stats?.likes)}</div>
-                      <div className="stat-label">Likes</div>
-                      <div className="stat-rate">{(result.stats?.likeRate || 0).toFixed(1)}%</div>
-                    </div>
-                    <div className="stat-card">
-                      <div className="stat-icon">💬</div>
-                      <div className="stat-number blue">{formatNumber(result.stats?.comments)}</div>
-                      <div className="stat-label">Commentaires</div>
-                      <div className="stat-rate">{(result.stats?.commentRate || 0).toFixed(1)}%</div>
-                    </div>
-                    <div className="stat-card">
-                      <div className="stat-icon">📤</div>
-                      <div className="stat-number green">{formatNumber(result.stats?.shares)}</div>
-                      <div className="stat-label">Partages</div>
-                      <div className="stat-rate">{(result.stats?.shareRate || 0).toFixed(1)}%</div>
-                    </div>
-                    <div className="stat-card">
-                      <div className="stat-icon">📌</div>
-                      <div className="stat-number yellow">{formatNumber(result.stats?.saves)}</div>
-                      <div className="stat-label">Sauvegardes</div>
-                      <div className="stat-rate">{(result.stats?.saveRate || 0).toFixed(1)}%</div>
-                    </div>
+                    <div className="stat-card"><div className="stat-icon">👁️</div><div className="stat-number pink">{formatNumber(result.stats?.views)}</div><div className="stat-label">Vues</div></div>
+                    <div className="stat-card"><div className="stat-icon">❤️</div><div className="stat-number red">{formatNumber(result.stats?.likes)}</div><div className="stat-label">Likes</div><div className="stat-rate">{(result.stats?.likeRate || 0).toFixed(1)}%</div></div>
+                    <div className="stat-card"><div className="stat-icon">💬</div><div className="stat-number blue">{formatNumber(result.stats?.comments)}</div><div className="stat-label">Commentaires</div><div className="stat-rate">{(result.stats?.commentRate || 0).toFixed(1)}%</div></div>
+                    <div className="stat-card"><div className="stat-icon">📤</div><div className="stat-number green">{formatNumber(result.stats?.shares)}</div><div className="stat-label">Partages</div><div className="stat-rate">{(result.stats?.shareRate || 0).toFixed(1)}%</div></div>
+                    <div className="stat-card"><div className="stat-icon">📌</div><div className="stat-number yellow">{formatNumber(result.stats?.saves)}</div><div className="stat-label">Sauvegardes</div><div className="stat-rate">{(result.stats?.saveRate || 0).toFixed(1)}%</div></div>
                   </div>
 
-                  {(result.hashtags?.length > 0) && (
-                    <div className="hashtags-card">
-                      <h3 className="section-title">Hashtags détectés</h3>
-                      <div className="hashtags-container">{result.hashtags.map((tag, index) => <span key={index} className="hashtag-tag">{tag}</span>)}</div>
-                    </div>
-                  )}
-                  
-                  {result.description && (
-                    <div className="description-card">
-                      <h3 className="section-title">📝 Description</h3>
-                      <p className="description-text">{result.description}</p>
-                    </div>
-                  )}
-                  
-                  {result.analysis && (
-                    <div className="advice-card">
-                      <h3 className="section-title">🔬 Analyse IA Détaillée</h3>
-                      <div className="advice-content">{renderAiAnalysis(result.analysis)}</div>
-                    </div>
-                  )}
-
-                  {result.advice && (
-                    <div className="advice-card">
-                      <h3 className="section-title">🎯 Recommandations IA</h3>
-                      <div className="advice-content">{result.advice}</div>
-                    </div>
-                  )}
-
-                  {result.predictions && (
-                    <div className="advice-card">
-                      <h3 className="section-title">🔮 Prédictions IA</h3>
-                      <div className="advice-content">{result.predictions}</div>
-                    </div>
-                  )}
+                  {(result.hashtags?.length > 0) && <div className="hashtags-card"><h3 className="section-title">Hashtags détectés</h3><div className="hashtags-container">{result.hashtags.map((tag, index) => <span key={index} className="hashtag-tag">{tag}</span>)}</div></div>}
+                  {result.description && <div className="description-card"><h3 className="section-title">📝 Description</h3><p className="description-text">{result.description}</p></div>}
+                  {result.analysis && <div className="advice-card"><h3 className="section-title">🔬 Analyse IA Détaillée</h3><div className="advice-content">{renderAiAnalysis(result.analysis)}</div></div>}
+                  {result.advice && <div className="advice-card"><h3 className="section-title">🎯 Recommandations IA</h3><div className="advice-content" style={{ whiteSpace: 'pre-wrap' }}>{result.advice}</div></div>}
+                  {result.predictions && <div className="advice-card"><h3 className="section-title">🔮 Prédictions IA</h3><div className="advice-content" style={{ whiteSpace: 'pre-wrap' }}>{result.predictions}</div></div>}
                 </div>
               )}
             </div>
@@ -260,7 +191,6 @@ export default function Home() {
         )}
       </div>
       <style jsx global>{`
-        /* ... TON CSS COMPLET VA ICI ... */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
         .app { min-height: 100vh; background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 30%, #2d1b69 70%, #4c1d95 100%); color: white; }
@@ -277,21 +207,24 @@ export default function Home() {
         .highlight { background: linear-gradient(90deg, #f472b6, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
         .hero-subtitle { font-size: 1.25rem; opacity: 0.8; margin-bottom: 3rem; }
         .input-section { max-width: 700px; margin: 0 auto 3rem; }
-        .input-container { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border-radius: 1rem; padding: 1.5rem; border: 1px solid rgba(255, 255, 255, 0.2); display: flex; gap: 0.75rem; margin-bottom: 1rem; }
-        .url-input { flex: 1; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 0.75rem; padding: 0.75rem 1rem; color: white; font-size: 1rem; outline: none; transition: all 0.3s; }
-        .url-input::placeholder { color: rgba(255, 255, 255, 0.5); }
+        .input-container { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border-radius: 1rem; padding: 1.5rem; border: 1px solid rgba(255, 255, 255, 0.2); margin-bottom: 1rem; }
+        .url-input { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 0.75rem; padding: 0.75rem 1rem; color: white; font-size: 1rem; outline: none; transition: all 0.3s; }
         .url-input:focus { border-color: #f472b6; box-shadow: 0 0 0 3px rgba(244, 114, 182, 0.3); }
-        .analyze-btn { background: linear-gradient(90deg, #ec4899, #9333ea); border: none; border-radius: 0.75rem; padding: 0.75rem 2rem; color: white; font-weight: 600; cursor: pointer; transition: all 0.3s; display: flex; align-items: center; gap: 0.5rem; min-width: 140px; justify-content: center; }
-        .analyze-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(236, 72, 153, 0.4); }
+        .analyze-buttons-container { display: flex; gap: 1rem; margin-top: 1rem; }
+        .analyze-btn { border: none; border-radius: 0.75rem; padding: 0.75rem 1rem; font-weight: 600; cursor: pointer; transition: all 0.3s; display: flex; align-items: center; gap: 0.5rem; justify-content: center; flex: 1; }
+        .analyze-btn.free { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.2); color: white; }
+        .analyze-btn.free:hover:not(:disabled) { background: rgba(255, 255, 255, 0.25); }
+        .analyze-btn.pro { background: linear-gradient(90deg, #ec4899, #9333ea); color: white; }
+        .analyze-btn.pro:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(236, 72, 153, 0.4); }
         .analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .spinner { width: 1rem; height: 1rem; border: 2px solid rgba(255, 255, 255, 0.3); border-top: 2px solid white; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .error-message { background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 0.5rem; padding: 0.75rem; color: #fecaca; }
         .results { max-width: 1200px; margin: 0 auto; }
         .thumbnail-card, .performance-badge, .hashtags-card, .description-card, .advice-card { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border-radius: 1rem; padding: 1.5rem; margin-bottom: 2rem; border: 1px solid rgba(255, 255, 255, 0.2); }
-        .thumbnail-img { max-width: 300px; border-radius: 0.75rem; margin-bottom: 1rem; }
+        .thumbnail-img { max-width: 300px; border-radius: 0.75rem; margin: 0 auto 1rem; display: block; }
         .video-info { text-align: center; }
-        .username { font-size: 1.25rem; font-weight: 600; color: #f472b6; margin-bottom: 0.5rem; }
+        .username { font-size: 1.25rem; font-weight: 600; color: #c084fc; margin-bottom: 0.5rem; }
         .niche-tag { display: inline-block; background: linear-gradient(90deg, #ec4899, #9333ea); padding: 0.25rem 1rem; border-radius: 9999px; font-size: 0.875rem; }
         .performance-badge { text-align: center; }
         .performance-badge.viral { border-color: #f472b6; background: linear-gradient(135deg, rgba(244, 114, 182, 0.2), rgba(244, 114, 182, 0.05)); }
@@ -313,9 +246,11 @@ export default function Home() {
         .section-title { font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; text-align: center; }
         .hashtags-container { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
         .hashtag-tag { background: linear-gradient(90deg, rgba(236, 72, 153, 0.2), rgba(147, 51, 234, 0.2)); border: 1px solid rgba(244, 114, 182, 0.3); padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem; }
-        .description-text, .advice-content { white-space: pre-wrap; line-height: 1.6; opacity: 0.9; text-align: left; }
+        .description-text { white-space: pre-wrap; line-height: 1.6; opacity: 0.9; text-align: left; }
+        .advice-content { white-space: pre-wrap; line-height: 1.6; opacity: 0.9; text-align: left; }
         .ai-list { list-style: none; padding: 0; text-align: left; }
         .ai-list li { margin-bottom: 0.5rem; }
+        .ai-list li strong { color: #c084fc; }
         .patterns-section { max-width: 1400px; margin: 0 auto; padding: 3rem 1.5rem; }
         .patterns-header { text-align: center; margin-bottom: 3rem; }
         .patterns-header h2 { font-size: 2.5rem; margin-bottom: 2rem; }
