@@ -1,7 +1,7 @@
 // pages/api/analyze.js
 import OpenAI from "openai";
-// MODIFICATION : On remplace l'ancienne ligne d'import par celle-ci
-const scrapingbee = require('scrapingbee'); 
+// LA CORRECTION EST ICI : On importe directement ScrapingBeeClient
+import ScrapingBeeClient from 'scrapingbee'; 
 import { extractFromHtml, computeRates } from '@/lib/extract';
 import { inferNiche } from '@/lib/niche';
 import { saveVideoAnalysis } from '@/lib/database';
@@ -33,8 +33,8 @@ export default async function handler(req, res) {
 
     if (tier === 'pro' && (!description || !thumbnail)) {
       console.log("Données incomplètes, appel à ScrapingBee en renfort...");
-      // C'est ici que l'ancienne version plantait. Maintenant ça va marcher.
-      const bee = new scrapingbee.ScrapingBeeClient(process.env.SCRAPINGBEE_API_KEY);
+      // ET LA CORRECTION EST ICI : on utilise directement new ScrapingBeeClient
+      const bee = new ScrapingBeeClient(process.env.SCRAPINGBEE_API_KEY);
       const beeResponse = await bee.get({ url: url, params: { 'render_js': true } });
 
       if (beeResponse.status < 200 || beeResponse.status >= 300) throw new Error(`ScrapingBee a échoué: ${beeResponse.status}`);
