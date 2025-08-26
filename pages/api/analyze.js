@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { scrapeTikTokVideo } from "../../lib/scrape";
 
 function pct(n) {
-  return Number.isFinite(n) ? Math.round(n * 10000) / 100 : 0; // 2 décimales
+  return Number.isFinite(n) ? Math.round(n * 10000) / 100 : 0;
 }
 
 export default async function handler(req, res) {
@@ -13,7 +13,16 @@ export default async function handler(req, res) {
     const { url } = req.body || {};
     if (!url) return res.status(400).json({ error: "URL manquante" });
 
+    console.log("Début scraping pour:", url);
+    
+    // Vérifiez si la clé OpenAI existe
+    if (!process.env.OPENAI_API_KEY) {
+      console.error("OPENAI_API_KEY manquante");
+      return res.status(500).json({ error: "Configuration OpenAI manquante" });
+    }
+
     const data = await scrapeTikTokVideo(url);
+    console.log("Données scrapées:", JSON.stringify(data, null, 2));
 
     const totalInteractions =
       (data.likes || 0) +
@@ -36,12 +45,13 @@ export default async function handler(req, res) {
       `Commentaires: ${data.comments} (${pct(commentRate)}%)`,
       `Partages: ${data.shares} (${pct(shareRate)}%)`,
       `Enregistrements: ${data.saves} (${pct(saveRate)}%)`,
-      `Taux d'engagement global: ${pct(engagementRate)}% (formule: (likes+commentaires+partages+enregistrements)/vues*100)`,
+      `Taux d'engagement global: ${pct(engagementRate)}%`,
       `Description: ${data.description}`,
       `Hashtags: ${data.hashtags.join(" ") || "(aucun)"}`,
-      `Donne 6 à 8 recommandations classées par priorité (titre court + explication en 1 phrase).`,
+      `Donne 6 à 8 recommandations classées par priorité.`,
     ].join("\n");
 
+    console.log("Appel OpenAI...");
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -63,6 +73,10 @@ export default async function handler(req, res) {
       advice: completion.choices?.[0]?.message?.content ?? "",
     });
   } catch (e) {
-    return res.status(500).json({ error: e.message || "Erreur serveur" });
+    console.error("Erreur complète:", e);
+    return res.status(500).json({ 
+      error: e.message || "Erreur serveur",
+      debug: e.stack
+    });
   }
 }
