@@ -32,6 +32,7 @@ export default function Home() {
   }
 
   const formatNumber = (num) => {
+    if (num === undefined || num === null) return 0;
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
     return num.toString();
@@ -96,23 +97,23 @@ export default function Home() {
                 {/* Stats Cards */}
                 <div className="stats-grid">
                   <div className="stat-card">
-                    <div className="stat-number pink">{formatNumber(result.data.views)}</div>
+                    <div className="stat-number pink">{formatNumber(result?.data?.views)}</div>
                     <div className="stat-label">Vues</div>
                   </div>
                   <div className="stat-card">
-                    <div className="stat-number red">{formatNumber(result.data.likes)}</div>
+                    <div className="stat-number red">{formatNumber(result?.data?.likes)}</div>
                     <div className="stat-label">Likes</div>
                   </div>
                   <div className="stat-card">
-                    <div className="stat-number blue">{formatNumber(result.data.comments)}</div>
+                    <div className="stat-number blue">{formatNumber(result?.data?.comments)}</div>
                     <div className="stat-label">Commentaires</div>
                   </div>
                   <div className="stat-card">
-                    <div className="stat-number green">{formatNumber(result.data.shares)}</div>
+                    <div className="stat-number green">{formatNumber(result?.data?.shares)}</div>
                     <div className="stat-label">Partages</div>
                   </div>
                   <div className="stat-card">
-                    <div className="stat-number yellow">{formatNumber(result.data.saves)}</div>
+                    <div className="stat-number yellow">{formatNumber(result?.data?.saves)}</div>
                     <div className="stat-label">Sauvegardes</div>
                   </div>
                 </div>
@@ -122,30 +123,30 @@ export default function Home() {
                   <h3 className="section-title">Taux d'engagement</h3>
                   <div className="engagement-grid">
                     <div className="engagement-item">
-                      <div className="engagement-number pink">{result.metrics.engagementRate.toFixed(1)}%</div>
+                      <div className="engagement-number pink">{(result?.metrics?.engagementRate ?? 0).toFixed(1)}%</div>
                       <div className="engagement-label">Global</div>
                     </div>
                     <div className="engagement-item">
-                      <div className="engagement-number red">{result.metrics.likeRate.toFixed(1)}%</div>
+                      <div className="engagement-number red">{(result?.metrics?.likeRate ?? 0).toFixed(1)}%</div>
                       <div className="engagement-label">Likes</div>
                     </div>
                     <div className="engagement-item">
-                      <div className="engagement-number blue">{result.metrics.commentRate.toFixed(1)}%</div>
+                      <div className="engagement-number blue">{(result?.metrics?.commentRate ?? 0).toFixed(1)}%</div>
                       <div className="engagement-label">Commentaires</div>
                     </div>
                     <div className="engagement-item">
-                      <div className="engagement-number green">{result.metrics.shareRate.toFixed(1)}%</div>
+                      <div className="engagement-number green">{(result?.metrics?.shareRate ?? 0).toFixed(1)}%</div>
                       <div className="engagement-label">Partages</div>
                     </div>
                     <div className="engagement-item">
-                      <div className="engagement-number yellow">{result.metrics.saveRate.toFixed(1)}%</div>
+                      <div className="engagement-number yellow">{(result?.metrics?.saveRate ?? 0).toFixed(1)}%</div>
                       <div className="engagement-label">Sauvegardes</div>
                     </div>
                   </div>
                 </div>
 
                 {/* Hashtags */}
-                {result.data.hashtags.length > 0 && (
+                {(result?.data?.hashtags?.length ?? 0) > 0 && (
                   <div className="hashtags-card">
                     <h3 className="section-title">Hashtags détectés</h3>
                     <div className="hashtags-container">
@@ -157,7 +158,7 @@ export default function Home() {
                 )}
 
                 {/* AI Recommendations */}
-                {result.advice && (
+                {result?.advice && (
                   <div className="advice-card">
                     <h3 className="section-title">Recommandations IA</h3>
                     <div className="advice-content">
