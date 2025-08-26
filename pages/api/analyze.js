@@ -1,7 +1,7 @@
 // pages/api/analyze.js
 import OpenAI from "openai";
-// LA CORRECTION EST ICI : On importe directement ScrapingBeeClient
-import ScrapingBeeClient from 'scrapingbee'; 
+// LIGNE 1 A CHANGER : On utilise 'require' pour une compatibilité maximale
+const scrapingbee = require('scrapingbee'); 
 import { extractFromHtml, computeRates } from '@/lib/extract';
 import { inferNiche } from '@/lib/niche';
 import { saveVideoAnalysis } from '@/lib/database';
@@ -33,8 +33,9 @@ export default async function handler(req, res) {
 
     if (tier === 'pro' && (!description || !thumbnail)) {
       console.log("Données incomplètes, appel à ScrapingBee en renfort...");
-      // ET LA CORRECTION EST ICI : on utilise directement new ScrapingBeeClient
-      const bee = new ScrapingBeeClient(process.env.SCRAPINGBEE_API_KEY);
+      
+      // LIGNE 2 A CHANGER : On utilise l'objet 'scrapingbee' pour créer le client
+      const bee = new scrapingbee.ScrapingBeeClient(process.env.SCRAPINGBEE_API_KEY);
       const beeResponse = await bee.get({ url: url, params: { 'render_js': true } });
 
       if (beeResponse.status < 200 || beeResponse.status >= 300) throw new Error(`ScrapingBee a échoué: ${beeResponse.status}`);
@@ -58,8 +59,8 @@ export default async function handler(req, res) {
     
     if (tier === 'pro' && process.env.OPENAI_API_KEY) {
       console.log("Lancement de l'analyse IA (Tier Pro)...");
-      // Ici tu peux remettre toute ta logique d'appel à OpenAI
-      advice = `Analyse Pro pour @${username} dans la niche ${detectedNiche}. Conseils IA basés sur les données complètes.`; // Placeholder
+      // Ta logique d'appel à OpenAI irait ici
+      advice = `Analyse Pro pour @${username} dans la niche ${detectedNiche}. Conseils IA basés sur les données complètes.`; 
     }
 
     const payload = { 
