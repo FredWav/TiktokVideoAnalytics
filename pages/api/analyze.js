@@ -58,28 +58,50 @@ export default async function handler(req, res) {
     const { url, tier } = req.body || {};
     if (!url) return res.status(400).json({ error: "URL manquante" });
 
+    console.log("Début scraping pour:", url, "Tier:", tier || "free");
+    
+    // Vérifiez si la clé OpenAI existe
+    if (!process.env.OPENAI_API_KEY) {
+      console.error("OPENAI_API_KEY manquante");
+    }
+
     let data = null;
     let scrapingMethod = "bruteforce";
 
+    // TOUJOURS essayer le bruteforce d'abord
     try {
       data = await scrapeTikTokVideo(url);
+      console.log("Données scrapées:", JSON.stringify(data, null, 2));
+      
       if (!data.views || data.views === 0) {
+        console.log("Bruteforce a retourné 0 vues");
         data = null;
       }
     } catch (e) {
+      console.error("Erreur bruteforce:", e.message);
       data = null;
     }
 
+    // Si bruteforce a échoué ET tier Pro, essayer ScrapingBee
     if (!data && tier === 'pro' && process.env.SCRAPINGBEE_API_KEY) {
+      console.log("Tentative avec ScrapingBee...");
       scrapingMethod = "scrapingbee";
+      
       try {
         const client = new ScrapingBeeClient(process.env.SCRAPINGBEE_API_KEY);
         const response = await client.get({
           url: url,
-          params: { 'render_js': true, 'wait': 3000, 'premium_proxy': true }
+          params: {
+            'render_js': true,
+            'wait': 3000,
+            'premium_proxy': true
+          }
         });
+        
         const decoder = new TextDecoder();
         const html = decoder.decode(response.data);
+        
+        // Parser le HTML pour extraire les données
         const sigiMatch = html.match(/<script id="SIGI_STATE"[^>]*>(.*?)<\/script>/);
         if (sigiMatch) {
           const sigiData = JSON.parse(sigiMatch[1]);
@@ -100,19 +122,21 @@ export default async function handler(req, res) {
           }
         }
       } catch (beeError) {
-        // ignore
+        console.error("Erreur ScrapingBee:", beeError);
       }
     }
 
+    // Si toujours pas de données
     if (!data || !data.views) {
-      return res.status(500).json({
-        error: tier === 'pro'
+      return res.status(500).json({ 
+        error: tier === 'pro' 
           ? "Impossible d'extraire les données. Vidéo privée ou structure modifiée."
           : "Extraction échouée. Essayez le mode Pro.",
         scrapingMethod
       });
     }
 
+    // Calcul des métriques
     const totalInteractions =
       (data.likes || 0) +
       (data.comments || 0) +
@@ -125,6 +149,7 @@ export default async function handler(req, res) {
     const shareRate = views > 0 ? (data.shares / views) * 100 : 0;
     const saveRate = views > 0 ? (data.saves / views) * 100 : 0;
 
+    // Détection de niche et username
     const username = extractUsername(url);
     const detectedNiche = inferNiche(data.description, data.hashtags);
     const performanceLevel = getPerformanceLevel(engagementRate);
@@ -134,10 +159,11 @@ export default async function handler(req, res) {
     let advice = "";
     let predictions = null;
 
+    // Analyse IA pour tier Pro
     if (tier === 'pro' && process.env.OPENAI_API_KEY) {
       const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
       
-      // Corrigé : on affiche les taux déjà calculés, pas de pct()
+      // Analyse complète en un seul appel
       const prompt = `Tu es consultant TikTok expert. Analyse ces données et retourne un JSON structuré.
 
 DONNÉES:
@@ -196,6 +222,7 @@ Retourne UNIQUEMENT ce JSON:
   }
 }`;
 
+      console.log("Appel OpenAI...");
       try {
         const completion = await client.chat.completions.create({
           model: "gpt-4o-mini",
@@ -206,27 +233,48 @@ Retourne UNIQUEMENT ce JSON:
           temperature: 0.4,
           response_format: { type: "json_object" }
         });
+
         const aiResult = JSON.parse(completion.choices?.[0]?.message?.content || "{}");
         analysis = aiResult.analysis;
         advice = aiResult.advice;
         predictions = aiResult.predictions;
       } catch (aiError) {
+        console.error("Erreur IA:", aiError);
         advice = [{"title": "Erreur IA", "details": "L'analyse IA a échoué"}];
       }
     } else if (tier === 'free') {
-      advice = [
-        {
-          title: "Conseils complets disponibles en Mode Pro",
-          details: "Passez en Mode Pro pour débloquer l'analyse IA et des recommandations personnalisées sur cette vidéo."
-        },
-        {
-          title: "Exemple (flouté)",
-          details: "Optimisez votre accroche pour maximiser la rétention. (détail réservé à la version Pro)"
-        }
-      ];
+      // Version gratuite : juste les conseils basiques
+      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const prompt = [
+        `Tu es consultant TikTok senior. Analyse les stats suivantes et propose des conseils concrets et actionnables (FR).`,
+        `URL: ${data.url}`,
+        `Vues: ${data.views}`,
+        `Likes: ${data.likes} (${likeRate.toFixed(1)}%)`,
+        `Commentaires: ${data.comments} (${commentRate.toFixed(1)}%)`,
+        `Partages: ${data.shares} (${shareRate.toFixed(1)}%)`,
+        `Enregistrements: ${data.saves} (${saveRate.toFixed(1)}%)`,
+        `Taux d'engagement global: ${engagementRate.toFixed(1)}%`,
+        `Description: ${data.description}`,
+        `Hashtags: ${data.hashtags.join(" ") || "(aucun)"}`,
+        `Donne 6 à 8 recommandations classées par priorité.`,
+      ].join("\n");
+
+      console.log("Appel OpenAI basique...");
+      const completion = await client.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: "Tu es un expert TikTok francophone, direct et précis." },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.4,
+      });
+
+      advice = completion.choices?.[0]?.message?.content ?? "";
     }
 
+    // Préparer la réponse complète
     const responseData = {
+      // Données de base (compatibilité avec l'ancien frontend)
       data: data,
       metrics: {
         engagementRate,
@@ -237,7 +285,9 @@ Retourne UNIQUEMENT ce JSON:
         performanceLevel
       },
       advice: advice,
-      thumbnail: null,
+      
+      // Nouvelles données pour le frontend amélioré
+      thumbnail: null, // À extraire si possible
       description: data.description,
       hashtags: data.hashtags,
       niche: detectedNiche,
@@ -262,6 +312,7 @@ Retourne UNIQUEMENT ce JSON:
       scrapingMethod: scrapingMethod
     };
 
+    // Sauvegarder en DB si tier Pro
     if (tier === 'pro') {
       try {
         await saveVideoAnalysis({
@@ -275,15 +326,17 @@ Retourne UNIQUEMENT ce JSON:
           analysis: analysis,
           timestamp: new Date().toISOString()
         });
+        console.log("Analyse sauvegardée en DB");
       } catch (dbError) {
-        // ignore
+        console.error("Erreur sauvegarde DB:", dbError);
       }
     }
 
     return res.status(200).json(responseData);
-
+    
   } catch (e) {
-    return res.status(500).json({
+    console.error("Erreur complète:", e);
+    return res.status(500).json({ 
       error: e.message || "Erreur serveur",
       debug: process.env.NODE_ENV === 'development' ? e.stack : undefined
     });
