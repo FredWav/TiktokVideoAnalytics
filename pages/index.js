@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 
-// Utils
 function formatNumber(n) {
   if (n == null) return "—";
   if (n < 1000) return n;
@@ -60,7 +59,6 @@ export default function Home() {
         throw new Error(data.error || "Erreur API Patterns");
       }
     } catch (err) {
-      console.error("Erreur chargement patterns:", err);
       setPatterns(null);
     }
     setLoadingPatterns(false);
@@ -73,7 +71,7 @@ export default function Home() {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, tier })
+        body: JSON.stringify({ url, tier }),
       });
       const data = await response.json();
       if (response.ok) {
@@ -107,15 +105,9 @@ export default function Home() {
             {activeTab === "analyze" && (
               <div className="input-section">
                 <div className="input-container">
-                  <input
-                    type="text"
-                    value={url}
-                    onChange={e => setUrl(e.target.value)}
-                    placeholder="https://www.tiktok.com/@username/video/..."
-                    className="url-input"
-                  />
+                  <input type="text" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://www.tiktok.com/@username/video/..." className="url-input" />
                 </div>
-                <div className="analyze-buttons-container">
+                <div className="analyze-buttons-container" style={{ marginBottom: "2rem" }}>
                   <button onClick={() => handleAnalyze('free')} className="analyze-btn free">Analyse Basique</button>
                   <button onClick={() => handleAnalyze('pro')} className="analyze-btn pro">✨ Analyse Pro (GPT-4o)</button>
                 </div>
