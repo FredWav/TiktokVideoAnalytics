@@ -4,8 +4,9 @@ import { ScrapingBeeClient } from 'scrapingbee';
 import { scrapeTikTokVideo } from "../../lib/scrape";
 import { saveVideoAnalysis } from '@/lib/database';
 
+// CORRECTEUR : format % (jamais >100%)
 function pct(n) {
-  return Number.isFinite(n) ? Math.round(n * 10000) / 100 : 0;
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
 }
 
 function getPerformanceLevel(engagementRate) {
@@ -54,53 +55,6 @@ function inferNiche(description, hashtags) {
   return "Lifestyle";
 }
 
-// ----------- CALCUL PRÉDICTIONS -----------
-
-// Potentiel viral sur 10, en tenant compte des vues
-function computeViralPotential(engagementRate, views, niche) {
-  const benchmark = NICHE_BENCHMARKS[niche]?.engagement || 5;
-  let score = (engagementRate / benchmark) * 8 + (engagementRate > benchmark ? 2 : 0);
-  score = Math.max(1, Math.min(Math.round(score), 10));
-  if (views < 25000) score = Math.min(score, 6); // Jamais "viral" sous 25k vues
-  return score;
-}
-
-function computeOptimizedViews(views, engagementRate, niche) {
-  if (engagementRate > (NICHE_BENCHMARKS[niche]?.engagement || 5)) {
-    const lower = Math.round(views * 1.2 / 1000);
-    const upper = Math.round(views * 1.8 / 1000);
-    return `${lower}k-${upper}k`;
-  }
-  const lower = Math.round(views * 0.7 / 1000);
-  const upper = Math.round(views * 1.2 / 1000);
-  return `${lower}k-${upper}k`;
-}
-
-function computeBestPostTime(niche) {
-  switch (niche) {
-    case "Gaming": return "21h-23h";
-    case "Cuisine": return "11h-13h";
-    case "Beauté/Mode": return "17h-20h";
-    case "Fitness/Sport": return "7h-9h, 18h-20h";
-    case "Danse": return "18h-21h";
-    case "Tech": return "20h-22h";
-    case "Musique": return "19h-22h";
-    case "Humour": return "17h-21h";
-    default: return "18h-20h";
-  }
-}
-
-function computeOptimalFrequency(niche) {
-  switch (niche) {
-    case "Gaming": return "5x/semaine";
-    case "Beauté/Mode": return "3x/semaine";
-    case "Cuisine": return "2-3x/semaine";
-    case "Fitness/Sport": return "4x/semaine";
-    case "Tech": return "2x/semaine";
-    default: return "3x/semaine";
-  }
-}
-
 export default async function handler(req, res) {
   if (req.method !== "POST")
     return res.status(405).json({ error: "Méthode non autorisée" });
@@ -111,7 +65,6 @@ export default async function handler(req, res) {
 
     console.log("Début scraping pour:", url, "Tier:", tier || "free");
     
-    // Vérifiez si la clé OpenAI existe
     if (!process.env.OPENAI_API_KEY) {
       console.error("OPENAI_API_KEY manquante");
     }
@@ -119,7 +72,6 @@ export default async function handler(req, res) {
     let data = null;
     let scrapingMethod = "bruteforce";
 
-    // TOUJOURS essayer le bruteforce d'abord
     try {
       data = await scrapeTikTokVideo(url);
       console.log("Données scrapées:", JSON.stringify(data, null, 2));
@@ -133,7 +85,6 @@ export default async function handler(req, res) {
       data = null;
     }
 
-    // Si bruteforce a échoué ET tier Pro, essayer ScrapingBee
     if (!data && tier === 'pro' && process.env.SCRAPINGBEE_API_KEY) {
       console.log("Tentative avec ScrapingBee...");
       scrapingMethod = "scrapingbee";
@@ -152,7 +103,6 @@ export default async function handler(req, res) {
         const decoder = new TextDecoder();
         const html = decoder.decode(response.data);
         
-        // Parser le HTML pour extraire les données
         const sigiMatch = html.match(/<script id="SIGI_STATE"[^>]*>(.*?)<\/script>/);
         if (sigiMatch) {
           const sigiData = JSON.parse(sigiMatch[1]);
@@ -177,7 +127,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // Si toujours pas de données
     if (!data || !data.views) {
       return res.status(500).json({ 
         error: tier === 'pro' 
@@ -187,20 +136,14 @@ export default async function handler(req, res) {
       });
     }
 
-    // Calcul des métriques
-    const totalInteractions =
-      (data.likes || 0) +
-      (data.comments || 0) +
-      (data.shares || 0) +
-      (data.saves || 0);
+    // CALCULS CORRECTS
     const views = data.views || 1;
-    const engagementRate = views > 0 ? (totalInteractions / views) * 100 : 0;
     const likeRate = views > 0 ? (data.likes / views) * 100 : 0;
     const commentRate = views > 0 ? (data.comments / views) * 100 : 0;
     const shareRate = views > 0 ? (data.shares / views) * 100 : 0;
     const saveRate = views > 0 ? (data.saves / views) * 100 : 0;
+    const engagementRate = views > 0 ? ((data.likes + data.comments + data.shares + data.saves) / views) * 100 : 0;
 
-    // Détection de niche et username
     const username = extractUsername(url);
     const detectedNiche = inferNiche(data.description, data.hashtags);
     const performanceLevel = getPerformanceLevel(engagementRate);
@@ -210,18 +153,10 @@ export default async function handler(req, res) {
     let advice = "";
     let predictions = null;
 
-    // ------ Calculs dynamiques prédictions ------
-    const viralPotential = computeViralPotential(engagementRate, views, detectedNiche);
-    const optimizedViews = computeOptimizedViews(views, engagementRate, detectedNiche);
-    const bestPostTime = computeBestPostTime(detectedNiche);
-    const optimalFrequency = computeOptimalFrequency(detectedNiche);
-
-    // Analyse IA pour tier Pro
     if (tier === 'pro' && process.env.OPENAI_API_KEY) {
       const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
       
-      // Prompt basé sur les stats & prédictions calculées
-      const prompt = `Tu es consultant TikTok expert. À partir des données suivantes, produis une analyse personnalisée et génère des prédictions réalistes (pas génériques).
+      const prompt = `Tu es consultant TikTok expert. Analyse ces données et retourne un JSON structuré.
 
 DONNÉES:
 URL: ${url}
@@ -237,15 +172,9 @@ Niche détectée: ${detectedNiche}
 Description: ${data.description}
 Hashtags: ${data.hashtags.join(" ") || "(aucun)"}
 
-Benchmark pour cette niche: Engagement moyen ${benchmarks.engagement}%
+Benchmark ${detectedNiche}: Engagement moyen ${benchmarks.engagement}%
 
-Prédictions calculées à partir des stats :
-- Potentiel viral (sur 10): ${viralPotential}
-- Vues optimisées: ${optimizedViews}
-- Meilleur horaire de post: ${bestPostTime}
-- Fréquence optimale: ${optimalFrequency}
-
-Utilise ces valeurs comme base pour le bloc predictions, tu peux les ajuster si tu vois une anomalie dans les stats. Retourne UNIQUEMENT ce JSON:
+Retourne UNIQUEMENT ce JSON:
 {
   "analysis": {
     "niche": "${detectedNiche}",
@@ -278,10 +207,10 @@ Utilise ces valeurs comme base pour le bloc predictions, tu peux les ajuster si 
     {"title": "Conseil 6", "details": "Détails du conseil"}
   ],
   "predictions": {
-    "viralPotential": ${viralPotential},
-    "optimizedViews": "${optimizedViews}",
-    "bestPostTime": "${bestPostTime}",
-    "optimalFrequency": "${optimalFrequency}"
+    "viralPotential": 7,
+    "optimizedViews": "100k-200k",
+    "bestPostTime": "18h-20h",
+    "optimalFrequency": "3x/semaine"
   }
 }`;
 
@@ -306,7 +235,6 @@ Utilise ces valeurs comme base pour le bloc predictions, tu peux les ajuster si 
         advice = [{"title": "Erreur IA", "details": "L'analyse IA a échoué"}];
       }
     } else if (tier === 'free') {
-      // Version gratuite : juste les conseils basiques
       const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
       const prompt = [
         `Tu es consultant TikTok senior. Analyse les stats suivantes et propose des conseils concrets et actionnables (FR).`,
@@ -335,7 +263,6 @@ Utilise ces valeurs comme base pour le bloc predictions, tu peux les ajuster si 
       advice = completion.choices?.[0]?.message?.content ?? "";
     }
 
-    // Préparer la réponse complète
     const responseData = {
       data: data,
       metrics: {
@@ -347,7 +274,6 @@ Utilise ces valeurs comme base pour le bloc predictions, tu peux les ajuster si 
         performanceLevel
       },
       advice: advice,
-
       thumbnail: null,
       description: data.description,
       hashtags: data.hashtags,
@@ -373,7 +299,6 @@ Utilise ces valeurs comme base pour le bloc predictions, tu peux les ajuster si 
       scrapingMethod: scrapingMethod
     };
 
-    // Sauvegarder en DB si tier Pro
     if (tier === 'pro') {
       try {
         await saveVideoAnalysis({
