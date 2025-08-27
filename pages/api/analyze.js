@@ -136,6 +136,8 @@ export default async function handler(req, res) {
 
     if (tier === 'pro' && process.env.OPENAI_API_KEY) {
       const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      
+      // Corrigé : on affiche les taux déjà calculés, pas de pct()
       const prompt = `Tu es consultant TikTok expert. Analyse ces données et retourne un JSON structuré.
 
 DONNÉES:
@@ -193,6 +195,7 @@ Retourne UNIQUEMENT ce JSON:
     "optimalFrequency": "3x/semaine"
   }
 }`;
+
       try {
         const completion = await client.chat.completions.create({
           model: "gpt-4o-mini",
@@ -203,7 +206,6 @@ Retourne UNIQUEMENT ce JSON:
           temperature: 0.4,
           response_format: { type: "json_object" }
         });
-
         const aiResult = JSON.parse(completion.choices?.[0]?.message?.content || "{}");
         analysis = aiResult.analysis;
         advice = aiResult.advice;
