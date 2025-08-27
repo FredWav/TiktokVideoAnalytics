@@ -54,6 +54,57 @@ function inferNiche(description, hashtags) {
   return "Lifestyle";
 }
 
+// ----------- AJOUT CALCULS PRÉDICTIONS -----------
+
+// Calcule le potentiel viral sur 10
+function computeViralPotential(engagementRate, niche) {
+  const benchmark = NICHE_BENCHMARKS[niche]?.engagement || 5;
+  let score = (engagementRate / benchmark) * 8 + (engagementRate > benchmark ? 2 : 0); // sur 10
+  score = Math.max(1, Math.min(Math.round(score), 10));
+  return score;
+}
+
+// Calcule la fourchette de vues optimisées
+function computeOptimizedViews(views, engagementRate, niche) {
+  // Si la vidéo performe au-dessus du benchmark → fourchette supérieure
+  if (engagementRate > (NICHE_BENCHMARKS[niche]?.engagement || 5)) {
+    const lower = Math.round(views * 1.2 / 1000);
+    const upper = Math.round(views * 1.8 / 1000);
+    return `${lower}k-${upper}k`;
+  }
+  // Si vidéo moyenne
+  const lower = Math.round(views * 0.7 / 1000);
+  const upper = Math.round(views * 1.2 / 1000);
+  return `${lower}k-${upper}k`;
+}
+
+// Horaire optimal en fonction de la niche (simplifié, à améliorer)
+function computeBestPostTime(niche) {
+  switch (niche) {
+    case "Gaming": return "21h-23h";
+    case "Cuisine": return "11h-13h";
+    case "Beauté/Mode": return "17h-20h";
+    case "Fitness/Sport": return "7h-9h, 18h-20h";
+    case "Danse": return "18h-21h";
+    case "Tech": return "20h-22h";
+    case "Musique": return "19h-22h";
+    case "Humour": return "17h-21h";
+    default: return "18h-20h";
+  }
+}
+
+// Fréquence optimale
+function computeOptimalFrequency(niche) {
+  switch (niche) {
+    case "Gaming": return "5x/semaine";
+    case "Beauté/Mode": return "3x/semaine";
+    case "Cuisine": return "2-3x/semaine";
+    case "Fitness/Sport": return "4x/semaine";
+    case "Tech": return "2x/semaine";
+    default: return "3x/semaine";
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST")
     return res.status(405).json({ error: "Méthode non autorisée" });
@@ -64,7 +115,6 @@ export default async function handler(req, res) {
 
     console.log("Début scraping pour:", url, "Tier:", tier || "free");
     
-    // Vérifiez si la clé OpenAI existe
     if (!process.env.OPENAI_API_KEY) {
       console.error("OPENAI_API_KEY manquante");
     }
@@ -72,7 +122,6 @@ export default async function handler(req, res) {
     let data = null;
     let scrapingMethod = "bruteforce";
 
-    // TOUJOURS essayer le bruteforce d'abord
     try {
       data = await scrapeTikTokVideo(url);
       console.log("Données scrapées:", JSON.stringify(data, null, 2));
@@ -86,7 +135,6 @@ export default async function handler(req, res) {
       data = null;
     }
 
-    // Si bruteforce a échoué ET tier Pro, essayer ScrapingBee
     if (!data && tier === 'pro' && process.env.SCRAPINGBEE_API_KEY) {
       console.log("Tentative avec ScrapingBee...");
       scrapingMethod = "scrapingbee";
@@ -105,7 +153,6 @@ export default async function handler(req, res) {
         const decoder = new TextDecoder();
         const html = decoder.decode(response.data);
         
-        // Parser le HTML pour extraire les données
         const sigiMatch = html.match(/<script id="SIGI_STATE"[^>]*>(.*?)<\/script>/);
         if (sigiMatch) {
           const sigiData = JSON.parse(sigiMatch[1]);
@@ -130,7 +177,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // Si toujours pas de données
     if (!data || !data.views) {
       return res.status(500).json({ 
         error: tier === 'pro' 
@@ -140,7 +186,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // Calcul des métriques
     const totalInteractions =
       (data.likes || 0) +
       (data.comments || 0) +
@@ -153,7 +198,6 @@ export default async function handler(req, res) {
     const shareRate = views > 0 ? (data.shares / views) * 100 : 0;
     const saveRate = views > 0 ? (data.saves / views) * 100 : 0;
 
-    // Détection de niche et username
     const username = extractUsername(url);
     const detectedNiche = inferNiche(data.description, data.hashtags);
     const performanceLevel = getPerformanceLevel(engagementRate);
@@ -163,12 +207,18 @@ export default async function handler(req, res) {
     let advice = "";
     let predictions = null;
 
+    // ------ Calculs dynamiques prédictions ------
+    const viralPotential = computeViralPotential(engagementRate, detectedNiche);
+    const optimizedViews = computeOptimizedViews(views, engagementRate, detectedNiche);
+    const bestPostTime = computeBestPostTime(detectedNiche);
+    const optimalFrequency = computeOptimalFrequency(detectedNiche);
+
     // Analyse IA pour tier Pro
     if (tier === 'pro' && process.env.OPENAI_API_KEY) {
       const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
       
-      // Analyse complète en un seul appel
-      const prompt = `Tu es consultant TikTok expert. Analyse ces données et retourne un JSON structuré.
+      // Prompt basé sur les stats & prédictions calculées
+      const prompt = `Tu es consultant TikTok expert. À partir des données suivantes, produis une analyse personnalisée et génère des prédictions réalistes (pas génériques).
 
 DONNÉES:
 URL: ${url}
@@ -184,9 +234,15 @@ Niche détectée: ${detectedNiche}
 Description: ${data.description}
 Hashtags: ${data.hashtags.join(" ") || "(aucun)"}
 
-Benchmark ${detectedNiche}: Engagement moyen ${benchmarks.engagement}%
+Benchmark pour cette niche: Engagement moyen ${benchmarks.engagement}%
 
-Retourne UNIQUEMENT ce JSON:
+Prédictions calculées à partir des stats :
+- Potentiel viral (sur 10): ${viralPotential}
+- Vues optimisées: ${optimizedViews}
+- Meilleur horaire de post: ${bestPostTime}
+- Fréquence optimale: ${optimalFrequency}
+
+Utilise ces valeurs comme base pour le bloc predictions, tu peux les ajuster si tu vois une anomalie dans les stats. Retourne UNIQUEMENT ce JSON:
 {
   "analysis": {
     "niche": "${detectedNiche}",
@@ -219,10 +275,10 @@ Retourne UNIQUEMENT ce JSON:
     {"title": "Conseil 6", "details": "Détails du conseil"}
   ],
   "predictions": {
-    "viralPotential": 7,
-    "optimizedViews": "100k-200k",
-    "bestPostTime": "18h-20h",
-    "optimalFrequency": "3x/semaine"
+    "viralPotential": ${viralPotential},
+    "optimizedViews": "${optimizedViews}",
+    "bestPostTime": "${bestPostTime}",
+    "optimalFrequency": "${optimalFrequency}"
   }
 }`;
 
@@ -276,9 +332,7 @@ Retourne UNIQUEMENT ce JSON:
       advice = completion.choices?.[0]?.message?.content ?? "";
     }
 
-    // Préparer la réponse complète
     const responseData = {
-      // Données de base (compatibilité avec l'ancien frontend)
       data: data,
       metrics: {
         engagementRate,
@@ -289,9 +343,8 @@ Retourne UNIQUEMENT ce JSON:
         performanceLevel
       },
       advice: advice,
-      
-      // Nouvelles données pour le frontend amélioré
-      thumbnail: null, // À extraire si possible
+
+      thumbnail: null,
       description: data.description,
       hashtags: data.hashtags,
       niche: detectedNiche,
