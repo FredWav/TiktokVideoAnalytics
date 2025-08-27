@@ -1,325 +1,348 @@
 // pages/api/analyze.js
 import OpenAI from "openai";
-import { ScrapingBeeClient } from 'scrapingbee'; // Import correct avec destructuring
-import { extractFromHtml, computeRates } from '@/lib/extract';
-import { inferNiche } from '@/lib/niche';
+import { ScrapingBeeClient } from 'scrapingbee';
+import { scrapeTikTokVideo } from "../../lib/scrape";
 import { saveVideoAnalysis } from '@/lib/database';
 
-// Helper functions
-function getPerformanceLevel(engagementRate) { 
-  if (engagementRate > 10) return "Virale"; 
-  if (engagementRate > 5) return "Excellente"; 
-  if (engagementRate > 3) return "Très bonne"; 
-  if (engagementRate > 1) return "Bonne"; 
-  if (engagementRate > 0.5) return "Moyenne"; 
-  return "Faible"; 
+function pct(n) {
+  return Number.isFinite(n) ? Math.round(n * 10000) / 100 : 0;
 }
 
-const NICHE_BENCHMARKS = { 
-  "Humour": { engagement: 8.5, likes: 7.2, comments: 0.8, shares: 0.5 }, 
-  "Danse": { engagement: 9.2, likes: 8.1, comments: 0.6, shares: 0.5 }, 
-  "Beauté/Mode": { engagement: 6.3, likes: 5.2, comments: 0.7, shares: 0.4 }, 
-  "Cuisine": { engagement: 7.1, likes: 6.0, comments: 0.6, shares: 0.5 }, 
-  "Fitness/Sport": { engagement: 5.2, likes: 4.3, comments: 0.5, shares: 0.4 }, 
-  "Éducation": { engagement: 4.8, likes: 3.9, comments: 0.6, shares: 0.3 }, 
-  "Tech": { engagement: 4.5, likes: 3.7, comments: 0.5, shares: 0.3 }, 
-  "Gaming": { engagement: 6.7, likes: 5.6, comments: 0.7, shares: 0.4 }, 
-  "Musique": { engagement: 7.8, likes: 6.7, comments: 0.6, shares: 0.5 }, 
-  "Lifestyle": { engagement: 5.5, likes: 4.6, comments: 0.5, shares: 0.4 } 
+function getPerformanceLevel(engagementRate) {
+  if (engagementRate > 10) return "Virale";
+  if (engagementRate > 5) return "Excellente";
+  if (engagementRate > 3) return "Très bonne";
+  if (engagementRate > 1) return "Bonne";
+  if (engagementRate > 0.5) return "Moyenne";
+  return "Faible";
+}
+
+const NICHE_BENCHMARKS = {
+  "Humour": { engagement: 8.5, likes: 7.2, comments: 0.8, shares: 0.5 },
+  "Danse": { engagement: 9.2, likes: 8.1, comments: 0.6, shares: 0.5 },
+  "Beauté/Mode": { engagement: 6.3, likes: 5.2, comments: 0.7, shares: 0.4 },
+  "Cuisine": { engagement: 7.1, likes: 6.0, comments: 0.6, shares: 0.5 },
+  "Fitness/Sport": { engagement: 5.2, likes: 4.3, comments: 0.5, shares: 0.4 },
+  "Éducation": { engagement: 4.8, likes: 3.9, comments: 0.6, shares: 0.3 },
+  "Tech": { engagement: 4.5, likes: 3.7, comments: 0.5, shares: 0.3 },
+  "Gaming": { engagement: 6.7, likes: 5.6, comments: 0.7, shares: 0.4 },
+  "Musique": { engagement: 7.8, likes: 6.7, comments: 0.6, shares: 0.5 },
+  "Lifestyle": { engagement: 5.5, likes: 4.6, comments: 0.5, shares: 0.4 }
 };
 
-function extractUsername(url) { 
-  const match = url.match(/@([^/]+)/); 
-  return match ? match[1] : 'unknown'; 
+function extractUsername(url) {
+  const match = url.match(/@([^/]+)/);
+  return match ? match[1] : 'unknown';
+}
+
+function inferNiche(description, hashtags) {
+  const text = `${description || ''} ${hashtags.join(' ')}`.toLowerCase();
+  const catalog = [
+    { name: 'Fitness/Sport', keys: ['fitness', 'workout', 'musculation', 'gym', 'sport'] },
+    { name: 'Humour', keys: ['humour', 'funny', 'drôle', 'comédie', 'blague', 'sketch'] },
+    { name: 'Éducation', keys: ['éducation', 'education', 'tuto', 'tutoriel', 'astuce', 'cours'] },
+    { name: 'Cuisine', keys: ['cuisine', 'recette', 'cooking', 'food', 'chef'] },
+    { name: 'Beauté/Mode', keys: ['beauté', 'beaute', 'makeup', 'maquillage', 'mode', 'fashion'] },
+    { name: 'Tech', keys: ['tech', 'technologie', 'hardware', 'logiciel', 'informatique'] },
+    { name: 'Gaming', keys: ['gaming', 'game', 'jeu', 'gamer', 'twitch'] },
+    { name: 'Musique', keys: ['musique', 'music', 'cover', 'guitare', 'piano', 'rap'] },
+    { name: 'Danse', keys: ['danse', 'dance', 'dancing', 'chorégraphie'] }
+  ];
+  for (const cat of catalog) {
+    if (cat.keys.some(k => text.includes(k))) return cat.name;
+  }
+  return "Lifestyle";
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST']);
-    return res.status(405).json({ error: 'Méthode non autorisée' });
-  }
+  if (req.method !== "POST")
+    return res.status(405).json({ error: "Méthode non autorisée" });
 
   try {
     const { url, tier } = req.body || {};
+    if (!url) return res.status(400).json({ error: "URL manquante" });
+
+    console.log("Début scraping pour:", url, "Tier:", tier || "free");
     
-    if (!url || typeof url !== 'string') {
-      return res.status(400).json({ error: 'URL TikTok manquante ou invalide.' });
+    // Vérifiez si la clé OpenAI existe
+    if (!process.env.OPENAI_API_KEY) {
+      console.error("OPENAI_API_KEY manquante");
     }
 
-    console.log(`Analyse démarrée - Tier: ${tier || 'free'}, URL: ${url}`);
+    let data = null;
+    let scrapingMethod = "bruteforce";
 
-    let html = "";
-    
-    // Récupération du HTML selon le tier
-    if (tier === 'pro') {
-      console.log("Mode Pro: Utilisation de ScrapingBee pour un scraping fiable...");
+    // TOUJOURS essayer le bruteforce d'abord
+    try {
+      data = await scrapeTikTokVideo(url);
+      console.log("Données scrapées:", JSON.stringify(data, null, 2));
       
-      if (!process.env.SCRAPINGBEE_API_KEY) {
-        throw new Error("Clé API ScrapingBee manquante. Configurez SCRAPINGBEE_API_KEY dans les variables d'environnement.");
+      if (!data.views || data.views === 0) {
+        console.log("Bruteforce a retourné 0 vues");
+        data = null;
       }
+    } catch (e) {
+      console.error("Erreur bruteforce:", e.message);
+      data = null;
+    }
+
+    // Si bruteforce a échoué ET tier Pro, essayer ScrapingBee
+    if (!data && tier === 'pro' && process.env.SCRAPINGBEE_API_KEY) {
+      console.log("Tentative avec ScrapingBee...");
+      scrapingMethod = "scrapingbee";
       
       try {
         const client = new ScrapingBeeClient(process.env.SCRAPINGBEE_API_KEY);
-        
         const response = await client.get({
           url: url,
           params: {
             'render_js': true,
             'wait': 3000,
-            'premium_proxy': true,
-            'country_code': 'us'
+            'premium_proxy': true
           }
         });
         
-        if (response.status < 200 || response.status >= 300) {
-          throw new Error(`ScrapingBee a échoué avec le statut: ${response.status}`);
-        }
-        
-        // Conversion de la réponse en string
         const decoder = new TextDecoder();
-        html = decoder.decode(response.data);
-        console.log("ScrapingBee réussi, HTML récupéré:", html.length, "caractères");
+        const html = decoder.decode(response.data);
         
+        // Parser le HTML pour extraire les données
+        const sigiMatch = html.match(/<script id="SIGI_STATE"[^>]*>(.*?)<\/script>/);
+        if (sigiMatch) {
+          const sigiData = JSON.parse(sigiMatch[1]);
+          const itemModule = sigiData?.ItemModule;
+          if (itemModule) {
+            const itemId = Object.keys(itemModule)[0];
+            const item = itemModule[itemId];
+            data = {
+              url: url,
+              views: item?.stats?.playCount || 0,
+              likes: item?.stats?.diggCount || 0,
+              comments: item?.stats?.commentCount || 0,
+              shares: item?.stats?.shareCount || 0,
+              saves: item?.stats?.collectCount || 0,
+              description: item?.desc || "",
+              hashtags: item?.textExtra?.filter(t => t.hashtagName).map(t => `#${t.hashtagName.toLowerCase()}`) || []
+            };
+          }
+        }
       } catch (beeError) {
         console.error("Erreur ScrapingBee:", beeError);
-        throw new Error(`Erreur ScrapingBee: ${beeError.message}`);
       }
-      
-    } else {
-      console.log("Mode Gratuit: Fetch direct (peut être limité)...");
-      
-      const fetchResponse = await fetch(url, {
-        headers: {
-          'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
-          'accept-language': 'fr-FR,fr;q=0.9,en-US;q=0.8',
-          'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
-        }
-      });
-      
-      if (!fetchResponse.ok) {
-        throw new Error(`Impossible de récupérer la page TikTok (${fetchResponse.status})`);
-      }
-      
-      html = await fetchResponse.text();
-      console.log("Fetch direct réussi, HTML récupéré:", html.length, "caractères");
     }
 
-    // Extraction des données du HTML
-    console.log("Extraction des données du HTML...");
-    const { description, hashtags, thumbnail, counts, duration } = extractFromHtml(html);
-    
-    console.log("Données extraites:", {
-      hasDescription: !!description,
-      hashtagCount: hashtags?.length || 0,
-      hasThumbnail: !!thumbnail,
-      counts,
-      duration
-    });
+    // Si toujours pas de données
+    if (!data || !data.views) {
+      return res.status(500).json({ 
+        error: tier === 'pro' 
+          ? "Impossible d'extraire les données. Vidéo privée ou structure modifiée."
+          : "Extraction échouée. Essayez le mode Pro.",
+        scrapingMethod
+      });
+    }
 
     // Calcul des métriques
-    const rates = computeRates(counts, duration);
+    const totalInteractions =
+      (data.likes || 0) +
+      (data.comments || 0) +
+      (data.shares || 0) +
+      (data.saves || 0);
+    const views = data.views || 1;
+    const engagementRate = views > 0 ? (totalInteractions / views) * 100 : 0;
+    const likeRate = views > 0 ? (data.likes / views) * 100 : 0;
+    const commentRate = views > 0 ? (data.comments / views) * 100 : 0;
+    const shareRate = views > 0 ? (data.shares / views) * 100 : 0;
+    const saveRate = views > 0 ? (data.saves / views) * 100 : 0;
+
+    // Détection de niche et username
     const username = extractUsername(url);
-    const detectedNiche = inferNiche(description, hashtags) || "Lifestyle";
-    const performanceLevel = getPerformanceLevel(rates.engagementRate || 0);
+    const detectedNiche = inferNiche(data.description, data.hashtags);
+    const performanceLevel = getPerformanceLevel(engagementRate);
     const benchmarks = NICHE_BENCHMARKS[detectedNiche] || NICHE_BENCHMARKS["Lifestyle"];
 
-    // Initialisation des variables pour l'IA
-    let aiAnalysis = null;
-    let advice = null;
+    let analysis = null;
+    let advice = "";
     let predictions = null;
-    let finalNiche = detectedNiche;
 
-    // Analyse IA pour le tier Pro uniquement
+    // Analyse IA pour tier Pro
     if (tier === 'pro' && process.env.OPENAI_API_KEY) {
-      console.log("Lancement de l'analyse IA avec GPT-4o...");
+      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
       
-      try {
-        const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-        
-        const aiPrompt = `Tu es un expert TikTok de niveau mondial. Analyse ces données et retourne un JSON structuré.
+      // Analyse complète en un seul appel
+      const prompt = `Tu es consultant TikTok expert. Analyse ces données et retourne un JSON structuré.
 
 DONNÉES:
-- URL: ${url}
-- Username: @${username}
-- Description: ${description || "Aucune"}
-- Hashtags: ${hashtags.join(" ") || "Aucun"}
-- Durée: ${duration}s
-- Vues: ${counts.views.toLocaleString()}
-- Likes: ${counts.likes.toLocaleString()} (${rates.likeRate?.toFixed(1)}%)
-- Commentaires: ${counts.comments.toLocaleString()} (${rates.commentRate?.toFixed(1)}%)
-- Partages: ${counts.shares.toLocaleString()} (${rates.shareRate?.toFixed(1)}%)
-- Sauvegardes: ${counts.saves.toLocaleString()} (${rates.saveRate?.toFixed(1)}%)
-- Engagement total: ${rates.engagementRate?.toFixed(1)}%
-- Performance: ${performanceLevel}
+URL: ${url}
+Username: @${username}
+Vues: ${data.views}
+Likes: ${data.likes} (${pct(likeRate)}%)
+Commentaires: ${data.comments} (${pct(commentRate)}%)
+Partages: ${data.shares} (${pct(shareRate)}%)
+Saves: ${data.saves} (${pct(saveRate)}%)
+Engagement: ${pct(engagementRate)}%
+Performance: ${performanceLevel}
+Niche détectée: ${detectedNiche}
+Description: ${data.description}
+Hashtags: ${data.hashtags.join(" ") || "(aucun)"}
 
-COMPARAISON BENCHMARKS ${detectedNiche}:
-- Engagement moyen niche: ${benchmarks.engagement}%
-- ${rates.engagementRate > benchmarks.engagement ? 'SURPERFORME' : 'SOUS-PERFORME'} de ${Math.abs(rates.engagementRate - benchmarks.engagement).toFixed(1)}%
+Benchmark ${detectedNiche}: Engagement moyen ${benchmarks.engagement}%
 
-FORMAT JSON OBLIGATOIRE:
+Retourne UNIQUEMENT ce JSON:
 {
   "analysis": {
-    "niche": "Niche précise (ex: 'Humour absurde')",
-    "subNiche": "Sous-catégorie spécifique",
-    "contentType": "Type exact (Sketch/Tutorial/Challenge/etc)",
-    "viralFactors": ["3-5 facteurs de succès identifiés"],
-    "weakPoints": ["2-3 points d'amélioration prioritaires"],
+    "niche": "${detectedNiche}",
+    "subNiche": "sous-catégorie précise",
+    "contentType": "type de contenu",
+    "viralFactors": ["facteur 1", "facteur 2", "facteur 3"],
+    "weakPoints": ["point faible 1", "point faible 2"],
     "audienceProfile": {
       "ageRange": "18-24 ans",
-      "primaryGender": "Mixte/Féminin/Masculin",
-      "interests": ["4 centres d'intérêt"]
+      "primaryGender": "estimation",
+      "interests": ["intérêt 1", "intérêt 2"]
     },
     "contentQuality": {
-      "hookScore": 8,
-      "retentionScore": 7,
-      "ctaScore": 6
+      "hookScore": 7,
+      "retentionScore": 6,
+      "ctaScore": 5
     },
     "hashtagAnalysis": {
       "effectiveness": 7,
-      "missing": ["#hashtag1", "#hashtag2", "#hashtag3"],
-      "trending": ${hashtags.some(h => ['#fyp', '#pourtoi', '#viral', '#foryou'].includes(h))}
+      "missing": ["#hashtag1", "#hashtag2"],
+      "trending": true
     }
   },
   "advice": [
-    {
-      "title": "Améliorer le hook",
-      "details": "Les 3 premières secondes doivent créer une tension narrative. Exemple: commencez par une question provocante ou un visuel surprenant."
-    },
-    {
-      "title": "Optimiser les hashtags",
-      "details": "Ajoutez 2-3 hashtags de niche spécifique avec 100k-1M de vues pour toucher une audience qualifiée."
-    },
-    {
-      "title": "Augmenter l'engagement",
-      "details": "Terminez par une question ouverte pour inciter aux commentaires. Les vidéos avec +50 commentaires ont 3x plus de reach."
-    }
+    {"title": "Conseil 1", "details": "Détails du conseil"},
+    {"title": "Conseil 2", "details": "Détails du conseil"},
+    {"title": "Conseil 3", "details": "Détails du conseil"},
+    {"title": "Conseil 4", "details": "Détails du conseil"},
+    {"title": "Conseil 5", "details": "Détails du conseil"},
+    {"title": "Conseil 6", "details": "Détails du conseil"}
   ],
   "predictions": {
     "viralPotential": 7,
-    "optimizedViews": "150k-300k",
+    "optimizedViews": "100k-200k",
     "bestPostTime": "18h-20h",
-    "optimalFrequency": "3-4 vidéos/semaine"
+    "optimalFrequency": "3x/semaine"
   }
-}
+}`;
 
-IMPORTANT: Les scores doivent être des NOMBRES (pas des strings). Sois précis et technique.`;
-
+      console.log("Appel OpenAI...");
+      try {
         const completion = await client.chat.completions.create({
-          model: "gpt-4o",
+          model: "gpt-4o-mini",
           messages: [
-            { 
-              role: "system", 
-              content: "Tu es un expert TikTok. Réponds UNIQUEMENT avec un JSON valide et structuré. Pas de texte avant ou après le JSON." 
-            },
-            { role: "user", content: aiPrompt }
+            { role: "system", content: "Tu es un expert TikTok. Réponds UNIQUEMENT en JSON valide." },
+            { role: "user", content: prompt },
           ],
-          temperature: 0.3,
-          max_tokens: 2000,
+          temperature: 0.4,
           response_format: { type: "json_object" }
         });
 
         const aiResult = JSON.parse(completion.choices?.[0]?.message?.content || "{}");
-        
-        // Extraction et validation des résultats
-        aiAnalysis = aiResult.analysis || null;
-        advice = aiResult.advice || null;
-        predictions = aiResult.predictions || null;
-        
-        // Mise à jour de la niche si l'IA en a trouvé une plus précise
-        if (aiAnalysis?.niche) {
-          finalNiche = aiAnalysis.niche;
-        }
-        
-        // Conversion des scores en nombres si nécessaire
-        if (aiAnalysis?.contentQuality) {
-          aiAnalysis.contentQuality.hookScore = Number(aiAnalysis.contentQuality.hookScore) || 0;
-          aiAnalysis.contentQuality.retentionScore = Number(aiAnalysis.contentQuality.retentionScore) || 0;
-          aiAnalysis.contentQuality.ctaScore = Number(aiAnalysis.contentQuality.ctaScore) || 0;
-        }
-        if (aiAnalysis?.hashtagAnalysis) {
-          aiAnalysis.hashtagAnalysis.effectiveness = Number(aiAnalysis.hashtagAnalysis.effectiveness) || 0;
-        }
-        if (predictions?.viralPotential) {
-          predictions.viralPotential = Number(predictions.viralPotential) || 0;
-        }
-        
-        console.log("Analyse IA complétée avec succès");
-        
+        analysis = aiResult.analysis;
+        advice = aiResult.advice;
+        predictions = aiResult.predictions;
       } catch (aiError) {
-        console.error("Erreur lors de l'analyse IA:", aiError);
-        // On continue sans l'IA, les données de base sont toujours utiles
+        console.error("Erreur IA:", aiError);
+        advice = [{"title": "Erreur IA", "details": "L'analyse IA a échoué"}];
       }
+    } else if (tier === 'free') {
+      // Version gratuite : juste les conseils basiques
+      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const prompt = [
+        `Tu es consultant TikTok senior. Analyse les stats suivantes et propose des conseils concrets et actionnables (FR).`,
+        `URL: ${data.url}`,
+        `Vues: ${data.views}`,
+        `Likes: ${data.likes} (${pct(likeRate)}%)`,
+        `Commentaires: ${data.comments} (${pct(commentRate)}%)`,
+        `Partages: ${data.shares} (${pct(shareRate)}%)`,
+        `Enregistrements: ${data.saves} (${pct(saveRate)}%)`,
+        `Taux d'engagement global: ${pct(engagementRate)}%`,
+        `Description: ${data.description}`,
+        `Hashtags: ${data.hashtags.join(" ") || "(aucun)"}`,
+        `Donne 6 à 8 recommandations classées par priorité.`,
+      ].join("\n");
+
+      console.log("Appel OpenAI basique...");
+      const completion = await client.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: "Tu es un expert TikTok francophone, direct et précis." },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.4,
+      });
+
+      advice = completion.choices?.[0]?.message?.content ?? "";
     }
 
-    // Construction de la réponse finale
-    const responsePayload = {
-      // Métadonnées
-      thumbnail: thumbnail || null,
-      description: description || "",
-      hashtags: hashtags || [],
-      niche: finalNiche,
-      username,
-      
-      // Statistiques
-      stats: {
-        views: counts.views || 0,
-        likes: counts.likes || 0,
-        comments: counts.comments || 0,
-        shares: counts.shares || 0,
-        saves: counts.saves || 0,
-        duration: duration || 0,
-        totalInteractions: rates.totalInteractions || 0,
-        engagementRate: rates.engagementRate || 0,
-        likeRate: rates.likeRate || 0,
-        commentRate: rates.commentRate || 0,
-        shareRate: rates.shareRate || 0,
-        saveRate: rates.saveRate || 0,
-        estimatedCompletionRate: rates.estimatedCompletionRate || 0
-      },
-      
-      // Métriques de performance
+    // Préparer la réponse complète
+    const responseData = {
+      // Données de base (compatibilité avec l'ancien frontend)
+      data: data,
       metrics: {
-        performanceLevel,
-        engagementRate: rates.engagementRate || 0,
-        likeRate: rates.likeRate || 0,
-        commentRate: rates.commentRate || 0,
-        shareRate: rates.shareRate || 0,
-        saveRate: rates.saveRate || 0
+        engagementRate,
+        likeRate,
+        commentRate,
+        shareRate,
+        saveRate,
+        performanceLevel
       },
-      
-      // Benchmarks de la niche
-      benchmarks,
-      
-      // Résultats IA (null si tier gratuit)
-      analysis: aiAnalysis,
       advice: advice,
-      predictions: predictions
+      
+      // Nouvelles données pour le frontend amélioré
+      thumbnail: null, // À extraire si possible
+      description: data.description,
+      hashtags: data.hashtags,
+      niche: detectedNiche,
+      username: username,
+      stats: {
+        views: data.views,
+        likes: data.likes,
+        comments: data.comments,
+        shares: data.shares,
+        saves: data.saves,
+        duration: 0,
+        engagementRate,
+        likeRate,
+        commentRate,
+        shareRate,
+        saveRate
+      },
+      benchmarks: benchmarks,
+      analysis: analysis,
+      predictions: predictions,
+      tier: tier || 'free',
+      scrapingMethod: scrapingMethod
     };
 
-    // Sauvegarde en base de données pour le tier Pro
+    // Sauvegarder en DB si tier Pro
     if (tier === 'pro') {
       try {
         await saveVideoAnalysis({
-          ...responsePayload,
           url,
+          username,
+          niche: detectedNiche,
+          stats: responseData.stats,
+          metrics: responseData.metrics,
+          description: data.description,
+          hashtags: data.hashtags,
+          analysis: analysis,
           timestamp: new Date().toISOString()
         });
-        console.log("Analyse sauvegardée en base de données");
+        console.log("Analyse sauvegardée en DB");
       } catch (dbError) {
         console.error("Erreur sauvegarde DB:", dbError);
-        // On continue même si la sauvegarde échoue
       }
     }
 
-    // Retour de la réponse
-    return res.status(200).json(responsePayload);
-
-  } catch (error) {
-    console.error('Erreur complète dans analyze.js:', error);
+    return res.status(200).json(responseData);
     
+  } catch (e) {
+    console.error("Erreur complète:", e);
     return res.status(500).json({ 
-      error: error.message || "Erreur serveur lors de l'analyse",
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: e.message || "Erreur serveur",
+      debug: process.env.NODE_ENV === 'development' ? e.stack : undefined
     });
   }
 }
