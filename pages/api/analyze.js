@@ -4,11 +4,6 @@ import { ScrapingBeeClient } from 'scrapingbee';
 import { scrapeTikTokVideo } from "../../lib/scrape";
 import { saveVideoAnalysis } from '@/lib/database';
 
-// Correction: function pct should NOT multiply by 10000/100 for percentage values already in percent
-function pct(n) {
-  return Number.isFinite(n) ? Math.round(n * 10) / 10 : 0;
-}
-
 function getPerformanceLevel(engagementRate) {
   if (engagementRate > 10) return "Virale";
   if (engagementRate > 5) return "Excellente";
@@ -66,7 +61,6 @@ export default async function handler(req, res) {
     let data = null;
     let scrapingMethod = "bruteforce";
 
-    // Bruteforce scraping d'abord
     try {
       data = await scrapeTikTokVideo(url);
       if (!data.views || data.views === 0) {
@@ -76,7 +70,6 @@ export default async function handler(req, res) {
       data = null;
     }
 
-    // ScrapingBee si bruteforce fail et tier Pro
     if (!data && tier === 'pro' && process.env.SCRAPINGBEE_API_KEY) {
       scrapingMethod = "scrapingbee";
       try {
@@ -120,26 +113,27 @@ export default async function handler(req, res) {
       });
     }
 
-    // Calculs stats (corrigé: pas de double multiplication)
+    const totalInteractions =
+      (data.likes || 0) +
+      (data.comments || 0) +
+      (data.shares || 0) +
+      (data.saves || 0);
     const views = data.views || 1;
+    const engagementRate = views > 0 ? (totalInteractions / views) * 100 : 0;
     const likeRate = views > 0 ? (data.likes / views) * 100 : 0;
     const commentRate = views > 0 ? (data.comments / views) * 100 : 0;
     const shareRate = views > 0 ? (data.shares / views) * 100 : 0;
     const saveRate = views > 0 ? (data.saves / views) * 100 : 0;
-    // Taux d'engagement global = (likes + comments + shares + saves) / vues * 100
-    const engagementRate = views > 0 ? ((data.likes + data.comments + data.shares + data.saves) / views) * 100 : 0;
 
-    // Détection
     const username = extractUsername(url);
     const detectedNiche = inferNiche(data.description, data.hashtags);
     const performanceLevel = getPerformanceLevel(engagementRate);
     const benchmarks = NICHE_BENCHMARKS[detectedNiche] || NICHE_BENCHMARKS["Lifestyle"];
 
     let analysis = null;
-    let advice = null;
+    let advice = "";
     let predictions = null;
 
-    // ---------- MODE PRO : IA, analyses et prédictions ----------
     if (tier === 'pro' && process.env.OPENAI_API_KEY) {
       const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
       const prompt = `Tu es consultant TikTok expert. Analyse ces données et retourne un JSON structuré.
@@ -204,22 +198,20 @@ Retourne UNIQUEMENT ce JSON:
           model: "gpt-4o-mini",
           messages: [
             { role: "system", content: "Tu es un expert TikTok. Réponds UNIQUEMENT en JSON valide." },
-            { role: "user", content: prompt }
+            { role: "user", content: prompt },
           ],
           temperature: 0.4,
           response_format: { type: "json_object" }
         });
+
         const aiResult = JSON.parse(completion.choices?.[0]?.message?.content || "{}");
         analysis = aiResult.analysis;
         advice = aiResult.advice;
         predictions = aiResult.predictions;
       } catch (aiError) {
-        advice = [{ title: "Erreur IA", details: "L'analyse IA a échoué" }];
+        advice = [{"title": "Erreur IA", "details": "L'analyse IA a échoué"}];
       }
-    }
-
-    // ---------- MODE BASIQUE : conseils simulés/floutés, pas d'IA ----------
-    if (tier === 'free') {
+    } else if (tier === 'free') {
       advice = [
         {
           title: "Conseils complets disponibles en Mode Pro",
@@ -242,7 +234,7 @@ Retourne UNIQUEMENT ce JSON:
         saveRate,
         performanceLevel
       },
-      advice,
+      advice: advice,
       thumbnail: null,
       description: data.description,
       hashtags: data.hashtags,
@@ -262,13 +254,12 @@ Retourne UNIQUEMENT ce JSON:
         saveRate
       },
       benchmarks: benchmarks,
-      analysis,
-      predictions,
+      analysis: analysis,
+      predictions: predictions,
       tier: tier || 'free',
-      scrapingMethod
+      scrapingMethod: scrapingMethod
     };
 
-    // Sauvegarde DB si Pro
     if (tier === 'pro') {
       try {
         await saveVideoAnalysis({
