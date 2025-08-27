@@ -130,8 +130,8 @@ export default function Home() {
                   />
                 </div>
                 <div className="analyze-buttons-container">
-                  <button onClick={() => handleAnalyze('free')} disabled={!!error} className="analyze-btn free">{result && result.tier === 'free' ? "Nouvelle analyse" : "Analyse Basique"}</button>
-                  <button onClick={() => handleAnalyze('pro')} disabled={!!error} className="analyze-btn pro">{result && result.tier === 'pro' ? "Nouvelle analyse Pro" : "✨ Analyse Pro (GPT-4o)"}</button>
+                  <button onClick={() => handleAnalyze('free')} className="analyze-btn free">Analyse Basique</button>
+                  <button onClick={() => handleAnalyze('pro')} className="analyze-btn pro">✨ Analyse Pro (GPT-4o)</button>
                 </div>
                 {error && <div className="error-message">⚠️ {error}</div>}
 
@@ -178,10 +178,10 @@ export default function Home() {
                         )}
                       </div>
                       <div className="side-col">
-                        {result.metrics?.performanceLevel && (
+                        {result.metrics && (
                           <div className={`card performance-badge ${getEngagementColor(result.metrics.engagementRate)}`}>
                             <div className="badge-label">Performance</div>
-                            <div className="badge-value">{result.metrics.performanceLevel}</div>
+                            <div className="badge-value">{getPerformanceLevel(result.metrics.engagementRate, result.stats.views)}</div>
                             <div className="badge-rate">{(result.metrics.engagementRate || 0).toFixed(1)}% d'engagement</div>
                           </div>
                         )}
@@ -331,8 +331,9 @@ export default function Home() {
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .error-message { background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 0.5rem; padding: 0.75rem; color: #fecaca; margin-top: 1rem; }
         .results { max-width: 1200px; margin: 0 auto; }
-        .results-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; align-items: flex-start; }
+        .results-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 2.5rem; align-items: flex-start; margin-bottom: 2.5rem; }
         .main-col, .side-col { display: flex; flex-direction: column; gap: 2rem; }
+        .card, .thumbnail-card, .performance-badge, .stats-card-container { margin-bottom: 0 !important; }
         .card { background: rgba(255, 255, 255, 0.08); backdrop-filter: blur(15px); border-radius: 1rem; padding: 1.5rem; border: 1px solid rgba(255, 255, 255, 0.15); }
         .thumbnail-card { text-align: center; }
         .thumbnail-img { max-width: 100%; max-height: 400px; border-radius: 0.75rem; margin: 0 auto 1rem; display: block; }
@@ -391,7 +392,7 @@ export default function Home() {
         .analysis-time { opacity: 0.7; text-align: right; }
         .no-data-card { text-align: center; }
         .no-data-card p { margin-bottom: 1rem; opacity: 0.8; }
-        @media (max-width: 900px) { .results-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 900px) { .results-grid { grid-template-columns: 1fr; gap: 2rem; } }
         @media (max-width: 768px) { .hero-title { font-size: 2rem; } .nav-content { flex-direction: column; gap: 1rem; } }
         @media (max-width: 768px) { .hero-title { font-size: 2rem; } .nav-content { flex-direction: column; gap: 1rem; } .stats-grid { grid-template-columns: repeat(2, 1fr); } .analysis-row { grid-template-columns: 1fr; gap: 0.5rem; text-align: center; } .analysis-time { text-align: center; } }
       `}</style>
