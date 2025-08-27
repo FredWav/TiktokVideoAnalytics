@@ -20,20 +20,6 @@ function getEngagementColor(rate) {
   if (rate > 1) return "average";
   return "low";
 }
-function getPerformanceLevel(engagementRate, views) {
-  if (views < 25000) {
-    if (engagementRate > 10) return "Prometteur";
-    if (engagementRate > 5) return "Très bonne";
-    if (engagementRate > 3) return "Bonne";
-    if (engagementRate > 1) return "Moyenne";
-    return "Faible";
-  }
-  if (engagementRate > 10) return "Virale";
-  if (engagementRate > 5) return "Excellente";
-  if (engagementRate > 3) return "Très bonne";
-  if (engagementRate > 1) return "Bonne";
-  return "Faible";
-}
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -179,10 +165,15 @@ export default function Home() {
                       </div>
                       <div className="side-col">
                         {result.metrics && (
-                          <div className={`card performance-badge ${getEngagementColor(result.metrics.engagementRate)}`}>
-                            <div className="badge-label">Performance</div>
-                            <div className="badge-value">{getPerformanceLevel(result.metrics.engagementRate, result.stats.views)}</div>
-                            <div className="badge-rate">{(result.metrics.engagementRate || 0).toFixed(1)}% d'engagement</div>
+                          <div className="card performance-badge">
+                            <div className="badge-label">Taux d'engagements</div>
+                            <div className="engagement-table">
+                              <div><strong>Global :</strong> {result.metrics.engagementRate.toFixed(1)}%</div>
+                              <div><strong>Likes :</strong> {result.metrics.likeRate.toFixed(1)}%</div>
+                              <div><strong>Commentaires :</strong> {result.metrics.commentRate.toFixed(1)}%</div>
+                              <div><strong>Partages :</strong> {result.metrics.shareRate.toFixed(1)}%</div>
+                              <div><strong>Saves :</strong> {result.metrics.saveRate.toFixed(1)}%</div>
+                            </div>
                           </div>
                         )}
                         <div className="card stats-card-container">
@@ -321,7 +312,7 @@ export default function Home() {
         .input-section { max-width: 700px; margin: 0 auto 3rem; }
         .input-container { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border-radius: 1rem; padding: 1.5rem; border: 1px solid rgba(255, 255, 255, 0.2); margin-bottom: 1rem; }
         .url-input { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 0.75rem; padding: 0.75rem 1rem; color: white; font-size: 1rem; outline: none; transition: all 0.3s; }
-        .analyze-buttons-container { display: flex; gap: 1rem; margin-top: 1rem; }
+        .analyze-buttons-container { display: flex; gap: 1rem; margin-top: 1rem; margin-bottom: 2rem; }
         .analyze-btn { border: none; border-radius: 0.75rem; padding: 0.75rem 1rem; font-weight: 600; cursor: pointer; transition: all 0.3s; display: flex; align-items: center; gap: 0.5rem; justify-content: center; flex: 1; font-size: 1rem; }
         .analyze-btn.free { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.2); color: white; }
         .analyze-btn.free:hover:not(:disabled) { background: rgba(255, 255, 255, 0.25); }
@@ -340,15 +331,9 @@ export default function Home() {
         .video-info { text-align: center; }
         .username { font-size: 1.25rem; font-weight: 600; color: #c084fc; margin-bottom: 0.5rem; }
         .niche-tag { display: inline-block; background: linear-gradient(90deg, #ec4899, #9333ea); padding: 0.25rem 1rem; border-radius: 9999px; font-size: 0.875rem; }
-        .performance-badge { text-align: center; }
-        .performance-badge.viral { border-color: #f472b6; }
-        .performance-badge.excellent { border-color: #4ade80; }
-        .performance-badge.good { border-color: #60a5fa; }
-        .performance-badge.average { border-color: #fbbf24; }
-        .performance-badge.low { border-color: #f87171; }
-        .badge-label { font-size: 0.875rem; opacity: 0.7; margin-bottom: 0.5rem; }
-        .badge-value { font-size: 2rem; font-weight: bold; margin-bottom: 0.5rem; }
-        .badge-rate { font-size: 1rem; opacity: 0.9; }
+        .performance-badge { text-align: left; }
+        .performance-badge .badge-label { font-size: 1rem; opacity: 0.8; margin-bottom: 0.5rem; text-align: left; }
+        .performance-badge .engagement-table { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.7rem; font-size: 1.1rem; text-align: left; align-items: flex-start; }
         .stats-card-container { padding: 1rem; }
         .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
         .stat-card { background: rgba(255, 255, 255, 0.1); border-radius: 0.75rem; padding: 1rem; text-align: center; font-size: 1.25rem; font-weight: bold; }
