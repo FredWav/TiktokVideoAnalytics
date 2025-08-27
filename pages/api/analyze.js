@@ -54,31 +54,28 @@ function inferNiche(description, hashtags) {
   return "Lifestyle";
 }
 
-// ----------- AJOUT CALCULS PRÉDICTIONS -----------
+// ----------- CALCUL PRÉDICTIONS -----------
 
-// Calcule le potentiel viral sur 10
-function computeViralPotential(engagementRate, niche) {
+// Potentiel viral sur 10, en tenant compte des vues
+function computeViralPotential(engagementRate, views, niche) {
   const benchmark = NICHE_BENCHMARKS[niche]?.engagement || 5;
-  let score = (engagementRate / benchmark) * 8 + (engagementRate > benchmark ? 2 : 0); // sur 10
+  let score = (engagementRate / benchmark) * 8 + (engagementRate > benchmark ? 2 : 0);
   score = Math.max(1, Math.min(Math.round(score), 10));
+  if (views < 25000) score = Math.min(score, 6); // Jamais "viral" sous 25k vues
   return score;
 }
 
-// Calcule la fourchette de vues optimisées
 function computeOptimizedViews(views, engagementRate, niche) {
-  // Si la vidéo performe au-dessus du benchmark → fourchette supérieure
   if (engagementRate > (NICHE_BENCHMARKS[niche]?.engagement || 5)) {
     const lower = Math.round(views * 1.2 / 1000);
     const upper = Math.round(views * 1.8 / 1000);
     return `${lower}k-${upper}k`;
   }
-  // Si vidéo moyenne
   const lower = Math.round(views * 0.7 / 1000);
   const upper = Math.round(views * 1.2 / 1000);
   return `${lower}k-${upper}k`;
 }
 
-// Horaire optimal en fonction de la niche (simplifié, à améliorer)
 function computeBestPostTime(niche) {
   switch (niche) {
     case "Gaming": return "21h-23h";
@@ -93,7 +90,6 @@ function computeBestPostTime(niche) {
   }
 }
 
-// Fréquence optimale
 function computeOptimalFrequency(niche) {
   switch (niche) {
     case "Gaming": return "5x/semaine";
@@ -115,6 +111,7 @@ export default async function handler(req, res) {
 
     console.log("Début scraping pour:", url, "Tier:", tier || "free");
     
+    // Vérifiez si la clé OpenAI existe
     if (!process.env.OPENAI_API_KEY) {
       console.error("OPENAI_API_KEY manquante");
     }
@@ -122,6 +119,7 @@ export default async function handler(req, res) {
     let data = null;
     let scrapingMethod = "bruteforce";
 
+    // TOUJOURS essayer le bruteforce d'abord
     try {
       data = await scrapeTikTokVideo(url);
       console.log("Données scrapées:", JSON.stringify(data, null, 2));
@@ -135,6 +133,7 @@ export default async function handler(req, res) {
       data = null;
     }
 
+    // Si bruteforce a échoué ET tier Pro, essayer ScrapingBee
     if (!data && tier === 'pro' && process.env.SCRAPINGBEE_API_KEY) {
       console.log("Tentative avec ScrapingBee...");
       scrapingMethod = "scrapingbee";
@@ -153,6 +152,7 @@ export default async function handler(req, res) {
         const decoder = new TextDecoder();
         const html = decoder.decode(response.data);
         
+        // Parser le HTML pour extraire les données
         const sigiMatch = html.match(/<script id="SIGI_STATE"[^>]*>(.*?)<\/script>/);
         if (sigiMatch) {
           const sigiData = JSON.parse(sigiMatch[1]);
@@ -177,6 +177,7 @@ export default async function handler(req, res) {
       }
     }
 
+    // Si toujours pas de données
     if (!data || !data.views) {
       return res.status(500).json({ 
         error: tier === 'pro' 
@@ -186,6 +187,7 @@ export default async function handler(req, res) {
       });
     }
 
+    // Calcul des métriques
     const totalInteractions =
       (data.likes || 0) +
       (data.comments || 0) +
@@ -198,6 +200,7 @@ export default async function handler(req, res) {
     const shareRate = views > 0 ? (data.shares / views) * 100 : 0;
     const saveRate = views > 0 ? (data.saves / views) * 100 : 0;
 
+    // Détection de niche et username
     const username = extractUsername(url);
     const detectedNiche = inferNiche(data.description, data.hashtags);
     const performanceLevel = getPerformanceLevel(engagementRate);
@@ -208,7 +211,7 @@ export default async function handler(req, res) {
     let predictions = null;
 
     // ------ Calculs dynamiques prédictions ------
-    const viralPotential = computeViralPotential(engagementRate, detectedNiche);
+    const viralPotential = computeViralPotential(engagementRate, views, detectedNiche);
     const optimizedViews = computeOptimizedViews(views, engagementRate, detectedNiche);
     const bestPostTime = computeBestPostTime(detectedNiche);
     const optimalFrequency = computeOptimalFrequency(detectedNiche);
@@ -332,6 +335,7 @@ Utilise ces valeurs comme base pour le bloc predictions, tu peux les ajuster si 
       advice = completion.choices?.[0]?.message?.content ?? "";
     }
 
+    // Préparer la réponse complète
     const responseData = {
       data: data,
       metrics: {
