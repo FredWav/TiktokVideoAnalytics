@@ -1,9 +1,13 @@
 module.exports = {
   extends: ['next', 'next/core-web-vitals'],
   rules: {
+    // Autorise console.warn et console.error, garde console.log en warning
     'no-console': ['warn', { allow: ['warn', 'error'] }],
+    // Temporairement off pour débloquer le build
     'react/no-unescaped-entities': 'off',
-    // Optionnel : si tu veux ignorer temporairement les hooks
-    // 'react-hooks/exhaustive-deps': 'warn',
+    // Tu peux passer cette règle en warn plutôt qu’erreur si besoin
+    'react-hooks/exhaustive-deps': 'warn',
+    // Optionnel : laisser l’avertissement <img>
+    // '@next/next/no-img-element': 'warn',
   },
 };
