@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 
 function formatNumber(n) {
   if (n == null) return "—";
@@ -44,26 +45,26 @@ export default function Home() {
   ];
 
   useEffect(() => {
+    async function loadPatterns() {
+      setLoadingPatterns(true);
+      try {
+        const response = await fetch(`/api/patterns?action=recent&niche=${selectedNiche}&limit=50`);
+        const data = await response.json();
+        if (data.success) {
+          setPatterns(data);
+        } else {
+          throw new Error(data.error || "Erreur API Patterns");
+        }
+      } catch (err) {
+        setPatterns(null);
+      }
+      setLoadingPatterns(false);
+    }
+
     if (activeTab === "patterns") {
       loadPatterns();
     }
   }, [activeTab, selectedNiche]);
-
-  async function loadPatterns() {
-    setLoadingPatterns(true);
-    try {
-      const response = await fetch(`/api/patterns?action=recent&niche=${selectedNiche}&limit=50`);
-      const data = await response.json();
-      if (data.success) {
-        setPatterns(data);
-      } else {
-        throw new Error(data.error || "Erreur API Patterns");
-      }
-    } catch (err) {
-      setPatterns(null);
-    }
-    setLoadingPatterns(false);
-  }
 
   async function handleAnalyze(tier = 'free') {
     setError("");
@@ -122,7 +123,7 @@ export default function Home() {
                       <div className="main-col">
                         {result.thumbnail && (
                           <div className="card thumbnail-card">
-                            <img src={result.thumbnail} alt="Vidéo thumbnail" className="thumbnail-img" />
+                            <Image src={result.thumbnail} alt="Vidéo thumbnail" className="thumbnail-img" width={320} height={180} />
                             <div className="video-info">
                               <div className="username">@{result.username || "unknown"}</div>
                               <div className="niche-tag">{result.niche}</div>
