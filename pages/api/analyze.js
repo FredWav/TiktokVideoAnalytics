@@ -58,7 +58,8 @@ export default async function handler(req, res) {
     const { url, tier } = req.body || {};
     if (!url) return res.status(400).json({ error: "URL manquante" });
 
-    console.log("Début scraping pour:", url, "Tier:", tier || "free");
+    // Utiliser console.warn pour rester conforme à la configuration ESLint
+    console.warn("Début scraping pour:", url, "Tier:", tier || "free");
     
     // Vérifiez si la clé OpenAI existe
     if (!process.env.OPENAI_API_KEY) {
@@ -71,10 +72,10 @@ export default async function handler(req, res) {
     // TOUJOURS essayer le bruteforce d'abord
     try {
       data = await scrapeTikTokVideo(url);
-      console.log("Données scrapées:", JSON.stringify(data, null, 2));
+      console.warn("Données scrapées:", JSON.stringify(data, null, 2));
       
       if (!data.views || data.views === 0) {
-        console.log("Bruteforce a retourné 0 vues");
+        console.warn("Bruteforce a retourné 0 vues");
         data = null;
       }
     } catch (e) {
@@ -84,7 +85,7 @@ export default async function handler(req, res) {
 
     // Si bruteforce a échoué ET tier Pro, essayer ScrapingBee
     if (!data && tier === 'pro' && process.env.SCRAPINGBEE_API_KEY) {
-      console.log("Tentative avec ScrapingBee...");
+      console.warn("Tentative avec ScrapingBee...");
       scrapingMethod = "scrapingbee";
       
       try {
@@ -222,7 +223,7 @@ Retourne UNIQUEMENT ce JSON:
   }
 }`;
 
-      console.log("Appel OpenAI...");
+      console.warn("Appel OpenAI...");
       try {
         const completion = await client.chat.completions.create({
           model: "gpt-4o-mini",
@@ -259,7 +260,7 @@ Retourne UNIQUEMENT ce JSON:
         `Donne 6 à 8 recommandations classées par priorité.`,
       ].join("\n");
 
-      console.log("Appel OpenAI basique...");
+      console.warn("Appel OpenAI basique...");
       const completion = await client.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
@@ -326,7 +327,7 @@ Retourne UNIQUEMENT ce JSON:
           analysis: analysis,
           timestamp: new Date().toISOString()
         });
-        console.log("Analyse sauvegardée en DB");
+        console.warn("Analyse sauvegardée en DB");
       } catch (dbError) {
         console.error("Erreur sauvegarde DB:", dbError);
       }

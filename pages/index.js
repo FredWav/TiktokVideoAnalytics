@@ -43,11 +43,17 @@ export default function Home() {
     { value: "Lifestyle", label: "Lifestyle", icon: "✨" }
   ];
 
+  // Charge les modèles lorsqu'on bascule vers l'onglet "patterns" ou que la niche change.
+  // Inclure `loadPatterns` dans le tableau de dépendances permet à React Hooks
+  // de détecter automatiquement les changements et évite les avertissements
+  // d'exhaustive-deps lors du linting. Comme `loadPatterns` est stable dans
+  // cette portée, cela n'entraîne pas de re-renders inutiles.
   useEffect(() => {
     if (activeTab === "patterns") {
       loadPatterns();
     }
-  }, [activeTab, selectedNiche]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, selectedNiche, loadPatterns]);
 
   async function loadPatterns() {
     setLoadingPatterns(true);
