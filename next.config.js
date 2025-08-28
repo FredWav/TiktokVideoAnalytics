@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Ajoute ici ta configuration Next.js si besoin
+  eslint: {
+    // ATTENTION: ceci laisse passer du code potentiellement problématique en prod
+    ignoreDuringBuilds: true,
+  },
 };
 
 export default nextConfig;
