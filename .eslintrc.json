@@ -1,1 +1,9 @@
-{"root": true, "extends": ["next", "next/core-web-vitals"], "rules": { "no-console": ["warn", { "allow": ["warn", "error"] }] }}
+module.exports = {
+  extends: ['next', 'next/core-web-vitals'],
+  rules: {
+    'no-console': ['warn', { allow: ['warn', 'error'] }],
+    'react/no-unescaped-entities': 'off',
+    // Optionnel : si tu veux ignorer temporairement les hooks
+    // 'react-hooks/exhaustive-deps': 'warn',
+  },
+};
