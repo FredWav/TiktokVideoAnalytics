@@ -97,6 +97,3 @@ pages/api/tiktok-analyze.js
 Run lint: `pnpm lint`  
 Run format: `pnpm format`
 
-## License
-
-(Choose a license; currently unlicensed - add one if distributing.)
