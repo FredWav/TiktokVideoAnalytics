@@ -1,10 +1,10 @@
-import { rateLimitCheck } from '../../lib/rateLimit.js';
-import cache from '../../lib/cache.js';
-import { getProfileHTML } from '../../lib/tiktokScraper.js';
-import { parseProfile } from '../../lib/tiktokParser.js';
-import { deriveStats } from '../../lib/tiktokStats.js';
-import { buildAIReport } from '../../lib/tiktokReport.js';
-import logger from '../../lib/logger.js';
+import { rateLimitCheck } from '@/lib/rateLimit.js';
+import cache from '@/lib/cache.js';
+import { getProfileHTML } from '@/lib/tiktokScraper.js';
+import { parseProfile } from '@/lib/tiktokParser.js';
+import { deriveStats } from '@/lib/tiktokStats.js';
+import { buildAIReport } from '@/lib/tiktokReport.js';
+import logger from '@/lib/logger.js';
 
 export const config = {
   maxDuration: 15

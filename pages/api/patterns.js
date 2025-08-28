@@ -1,5 +1,5 @@
 // pages/api/patterns.js
-import { getNicheInsights, getAnalysesByNiche, exportPatterns } from "../../lib/database";
+import { getNicheInsights, getAnalysesByNiche, exportPatterns } from "@/lib/database";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
