@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
+const nextConfig = {
+  // Ajoute ici ta configuration Next.js si besoin
+};
 
-module.exports = nextConfig;
+export default nextConfig;
