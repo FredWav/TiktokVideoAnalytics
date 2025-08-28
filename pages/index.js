@@ -1,298 +1,207 @@
-import React, { useState, useEffect } from "react";
-
-function formatNumber(n) {
-  if (n == null) return "—";
-  if (n < 1000) return n;
-  if (n < 1000000) return `${(n / 1000).toFixed(1)}K`;
-  return `${(n / 1000000).toFixed(2)}M`;
-}
-function formatDuration(s) {
-  if (!s || isNaN(s)) return "—";
-  const min = Math.floor(s / 60);
-  const sec = Math.round(s % 60);
-  return `${min}m${sec.toString().padStart(2, "0")}s`;
-}
-function getEngagementColor(rate) {
-  if (rate > 10) return "viral";
-  if (rate > 5) return "excellent";
-  if (rate > 3) return "good";
-  if (rate > 1) return "average";
-  return "low";
-}
+import { useState } from "react";
+import Head from "next/head";
 
 export default function Home() {
-  const [url, setUrl] = useState("");
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("analyze");
-  const [patterns, setPatterns] = useState(null);
-  const [loadingPatterns, setLoadingPatterns] = useState(false);
-  const [selectedNiche, setSelectedNiche] = useState("Humour");
+  const [tab, setTab] = useState("video"); // "video" | "compte"
 
-  const niches = [
-    { value: "Humour", label: "Humour", icon: "😂" },
-    { value: "Danse", label: "Danse", icon: "💃" },
-    { value: "Beauté/Mode", label: "Beauté/Mode", icon: "💄" },
-    { value: "Cuisine", label: "Cuisine", icon: "🍔" },
-    { value: "Fitness/Sport", label: "Fitness/Sport", icon: "💪" },
-    { value: "Éducation", label: "Éducation", icon: "📚" },
-    { value: "Tech", label: "Tech", icon: "💻" },
-    { value: "Gaming", label: "Gaming", icon: "🎮" },
-    { value: "Musique", label: "Musique", icon: "🎵" },
-    { value: "Lifestyle", label: "Lifestyle", icon: "✨" }
-  ];
+  // Vidéo
+  const [videoUrl, setVideoUrl] = useState("");
+  const [vLoading, setVLoading] = useState(false);
+  const [vError, setVError] = useState("");
+  const [vResult, setVResult] = useState(null);
 
-  // Charge les modèles lorsqu'on bascule vers l'onglet "patterns" ou que la niche change.
-  // Inclure `loadPatterns` dans le tableau de dépendances permet à React Hooks
-  // de détecter automatiquement les changements et évite les avertissements
-  // d'exhaustive-deps lors du linting. Comme `loadPatterns` est stable dans
-  // cette portée, cela n'entraîne pas de re-renders inutiles.
-  useEffect(() => {
-    if (activeTab === "patterns") {
-      loadPatterns();
+  // Compte
+  const [accountInput, setAccountInput] = useState("");
+  const [aLoading, setALoading] = useState(false);
+  const [aError, setAError] = useState("");
+  const [aResult, setAResult] = useState(null);
+
+  async function analyzeVideo(pro) {
+    setVError("");
+    setVResult(null);
+
+    if (!videoUrl.trim()) {
+      setVError("Colle une URL vidéo TikTok valide.");
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, selectedNiche, loadPatterns]);
 
-  async function loadPatterns() {
-    setLoadingPatterns(true);
+    setVLoading(true);
     try {
-      const response = await fetch(`/api/patterns?action=recent&niche=${selectedNiche}&limit=50`);
-      const data = await response.json();
-      if (data.success) {
-        setPatterns(data);
-      } else {
-        throw new Error(data.error || "Erreur API Patterns");
-      }
-    } catch (err) {
-      setPatterns(null);
-    }
-    setLoadingPatterns(false);
-  }
-
-  async function handleAnalyze(tier = 'free') {
-    setError("");
-    setResult(null);
-    setLoading(true);
-    try {
-      const response = await fetch("/api/analyze", {
+      // On conserve l’endpoint déjà existant de ton projet
+      const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, tier }),
+        body: JSON.stringify({ url: videoUrl, pro: !!pro }),
       });
-      const data = await response.json();
-      if (response.ok) {
-        setResult(data);
-      } else {
-        setError(data.error || "Erreur inconnue");
-      }
-    } catch (err) {
-      setError("Erreur réseau");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Erreur inconnue.");
+      setVResult(data);
+    } catch (e) {
+      setVError(e.message);
+    } finally {
+      setVLoading(false);
     }
-    setLoading(false);
+  }
+
+  async function analyzeAccount() {
+    setAError("");
+    setAResult(null);
+
+    if (!accountInput.trim()) {
+      setAError("Entre un @username ou un lien de profil TikTok.");
+      return;
+    }
+
+    setALoading(true);
+    try {
+      const res = await fetch("/api/analyze-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: accountInput }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Erreur inconnue.");
+      setAResult(data);
+    } catch (e) {
+      setAError(e.message);
+    } finally {
+      setALoading(false);
+    }
   }
 
   return (
     <>
-      <div className="app">
-        <nav className="nav">
-          <div className="nav-content">
-            <div className="logo">TikTok Analytics Pro</div>
-            <div className="nav-tabs">
-              <button className={`nav-tab ${activeTab === "analyze" ? "active" : ""}`} onClick={() => setActiveTab("analyze")}>Analyser</button>
-              <button className={`nav-tab ${activeTab === "patterns" ? "active" : ""}`} onClick={() => setActiveTab("patterns")}>Patterns & Insights</button>
+      <Head>
+        <title>TikTok Analytics Pro — Analyse Vidéo & Compte</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </Head>
+
+      <main className="min-h-screen bg-[#0b1020] text-white">
+        <header className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
+          <div className="text-pink-300 font-bold">TikTok Analytics Pro</div>
+          <div className="hidden md:flex gap-2">
+            <a className="px-3 py-1 rounded-lg bg-white/5 border border-white/10">Analyser</a>
+            <a className="px-3 py-1 rounded-lg bg-white/0 border border-white/10">Patterns & Insights</a>
+          </div>
+        </header>
+
+        <section className="max-w-4xl mx-auto px-6 py-10">
+          <h1 className="text-4xl md:text-5xl font-bold text-center">
+            Analyse <span className="text-pink-400">TikTok</span> avec GPT-4o
+          </h1>
+          <p className="mt-3 text-center text-white/70">
+            Obtenez des insights professionnels sur une <b>vidéo</b> ou un <b>compte</b>, depuis une seule page.
+          </p>
+
+          {/* Toggle Vidéo / Compte */}
+          <div className="mt-8 flex w-full justify-center">
+            <div className="inline-flex rounded-xl bg-white/5 border border-white/10 p-1">
+              <button
+                onClick={() => setTab("video")}
+                className={`px-4 py-2 rounded-lg font-semibold ${tab === "video" ? "bg-gradient-to-r from-pink-500 to-purple-600" : "hover:bg-white/10"}`}
+              >
+                Analyse Vidéo
+              </button>
+              <button
+                onClick={() => setTab("compte")}
+                className={`px-4 py-2 rounded-lg font-semibold ${tab === "compte" ? "bg-gradient-to-r from-pink-500 to-purple-600" : "hover:bg-white/10"}`}
+              >
+                Analyse Compte
+              </button>
             </div>
           </div>
-        </nav>
 
-        <div className="hero">
-          <div className="hero-content">
-            <h1 className="hero-title">Analyse <span className="highlight">TikTok</span> avec GPT-4o</h1>
-            <p className="hero-subtitle">Obtenez des insights de niveau professionnel sur n&apos;importe quelle vidéo.</p>
+          {/* Bloc VIDÉO */}
+          {tab === "video" && (
+            <div className="mt-10">
+              <div className="rounded-2xl bg-white/5 border border-white/10 p-6">
+                <input
+                  value={videoUrl}
+                  onChange={(e) => setVideoUrl(e.target.value)}
+                  placeholder="https://www.tiktok.com/@username/video/..."
+                  className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-4 outline-none focus:border-pink-500"
+                />
 
-            {activeTab === "analyze" && (
-              <div className="input-section">
-                <div className="input-container">
-                  <input type="text" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://www.tiktok.com/@username/video/..." className="url-input" />
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    disabled={vLoading}
+                    onClick={() => analyzeVideo(false)}
+                    className="rounded-xl px-6 py-4 bg-white/10 hover:bg-white/20 border border-white/10 font-semibold disabled:opacity-60"
+                  >
+                    {vLoading ? "Analyse..." : "Analyse Basique"}
+                  </button>
+                  <button
+                    disabled={vLoading}
+                    onClick={() => analyzeVideo(true)}
+                    className="rounded-xl px-6 py-4 bg-gradient-to-r from-pink-500 to-purple-600 font-semibold disabled:opacity-60"
+                  >
+                    {vLoading ? "Analyse Pro..." : "⭐ Analyse Pro (GPT-4o)"}
+                  </button>
                 </div>
-                <div className="analyze-buttons-container">
-                  <button onClick={() => handleAnalyze('free')} disabled={loading} className="analyze-btn free">{loading ? <div className="spinner"></div> : 'Analyse Basique'}</button>
-                  <button onClick={() => handleAnalyze('pro')} disabled={loading} className="analyze-btn pro">{loading ? <div className="spinner"></div> : '✨ Analyse Pro (GPT-4o)'}</button>
-                </div>
-                {error && <div className="error-message">⚠️ {error}</div>}
 
-                {result && (
-                  <div className="results">
-                    <div className="results-grid">
-                      <div className="main-col">
-                        {result.thumbnail && (
-                          <div className="card thumbnail-card">
-                            <img src={result.thumbnail} alt="Vidéo thumbnail" className="thumbnail-img" />
-                            <div className="video-info">
-                              <div className="username">@{result.username || "unknown"}</div>
-                              <div className="niche-tag">{result.niche}</div>
-                            </div>
-                          </div>
-                        )}
-                        {result.description && (
-                          <div className="card">
-                            <h3 className="section-title">📝 Description</h3>
-                            <p className="description-text">{result.description}</p>
-                          </div>
-                        )}
-                        {(result.hashtags?.length > 0) && (
-                          <div className="card">
-                            <h3 className="section-title">Hashtags</h3>
-                            <div className="hashtags-container">
-                              {result.hashtags.map((tag, index) => (
-                                <span key={index} className="hashtag-tag">{tag}</span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {result.analysis && (
-                          <div className="card">
-                            <h3 className="section-title">🔬 Analyse Détaillée</h3>
-                            <ul className="ai-list">
-                              <li><strong>Type de contenu :</strong> {result.analysis.contentType}</li>
-                              <li><strong>Hook (Accroche) :</strong> {result.analysis.hookScore}/10</li>
-                              <li><strong>CTA (Appel à l&apos;action) :</strong> {result.analysis.ctaScore}/10</li>
-                              <li><strong>Points forts :</strong> {result.analysis.viralFactors?.join(', ')}</li>
-                              <li><strong>Points faibles :</strong> {result.analysis.weakPoints?.join(', ')}</li>
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                      <div className="side-col">
-                        {result.metrics && (
-                          <div className="card performance-badge">
-                            <div className="badge-label">Taux d&apos;engagements</div>
-                            <div className="engagement-table">
-                              <div><strong>Global :</strong> {result.metrics.engagementRate.toFixed(1)}%</div>
-                              <div><strong>Likes :</strong> {result.metrics.likeRate.toFixed(1)}%</div>
-                              <div><strong>Commentaires :</strong> {result.metrics.commentRate.toFixed(1)}%</div>
-                              <div><strong>Partages :</strong> {result.metrics.shareRate.toFixed(1)}%</div>
-                              <div><strong>Saves :</strong> {result.metrics.saveRate.toFixed(1)}%</div>
-                            </div>
-                          </div>
-                        )}
-                        <div className="card stats-card-container">
-                          <div className="stats-grid">
-                            <div className="stat-card"><div>👁️</div><div>{formatNumber(result.stats?.views)}</div><div className="stat-label">Vues</div></div>
-                            <div className="stat-card"><div>❤️</div><div>{formatNumber(result.stats?.likes)}</div><div className="stat-label">Likes</div></div>
-                            <div className="stat-card"><div>💬</div><div>{formatNumber(result.stats?.comments)}</div><div className="stat-label">Comms</div></div>
-                            <div className="stat-card"><div>📤</div><div>{formatNumber(result.stats?.shares)}</div><div className="stat-label">Partages</div></div>
-                            <div className="stat-card"><div>📌</div><div>{formatNumber(result.stats?.saves)}</div><div className="stat-label">Saves</div></div>
-                            <div className="stat-card"><div>⏱️</div><div>{formatDuration(result.stats?.duration)}</div><div className="stat-label">Durée</div></div>
-                          </div>
-                        </div>
-                        {result.predictions && (
-                          <div className="card">
-                            <h3 className="section-title">🔮 Prédictions</h3>
-                            <ul className="ai-list">
-                              <li><strong>Potentiel Viral :</strong> {result.predictions.viralPotential}/10</li>
-                              <li><strong>Vues Optimisées :</strong> {result.predictions.optimizedViews}</li>
-                              <li><strong>Poster à :</strong> {result.predictions.bestPostTime}</li>
-                              <li><strong>Fréquence :</strong> {result.predictions.optimalFrequency}</li>
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {result.advice && (
-                      <div className="card advice-card">
-                        <h3 className="section-title">🎯 Recommandations Stratégiques</h3>
-                        <div className="advice-list">
-                          {Array.isArray(result.advice) ? result.advice.map((item, index) => (
-                            <div key={index} className="advice-item">
-                              <h4>{item.title}</h4>
-                              <p>{item.details}</p>
-                            </div>
-                          )) : null}
-                        </div>
-                      </div>
-                    )}
+                {vError && (
+                  <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-red-200">
+                    {vError}
+                  </div>
+                )}
+
+                {vResult && (
+                  <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-4">
+                    <h3 className="text-xl font-semibold mb-2">Résultats vidéo</h3>
+                    <pre className="text-sm whitespace-pre-wrap text-white/80">
+                      {JSON.stringify(vResult, null, 2)}
+                    </pre>
                   </div>
                 )}
               </div>
-            )}
+            </div>
+          )}
 
-            {activeTab === "patterns" && (
-              <div className="patterns-section">
-                <div className="patterns-header">
-                  <h2>Patterns & Insights par Niche</h2>
-                  <div className="niche-selector">
-                    {niches.map(niche => (
-                      <button
-                        key={niche.value}
-                        className={`niche-btn ${selectedNiche === niche.value ? 'active' : ''}`}
-                        onClick={() => setSelectedNiche(niche.value)}
-                      >
-                        <span className="niche-icon">{niche.icon}</span>
-                        <span className="niche-label">{niche.label}</span>
-                      </button>
-                    ))}
-                  </div>
+          {/* Bloc COMPTE */}
+          {tab === "compte" && (
+            <div className="mt-10">
+              <div className="rounded-2xl bg-white/5 border border-white/10 p-6">
+                <input
+                  value={accountInput}
+                  onChange={(e) => setAccountInput(e.target.value)}
+                  placeholder="Ex: @fredwav ou https://www.tiktok.com/@fredwav"
+                  className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-4 outline-none focus:border-pink-500"
+                />
+
+                <div className="mt-4">
+                  <button
+                    disabled={aLoading}
+                    onClick={analyzeAccount}
+                    className="rounded-xl px-6 py-4 bg-gradient-to-r from-pink-500 to-purple-600 font-semibold disabled:opacity-60"
+                  >
+                    {aLoading ? "Analyse en cours..." : "Lancer l’analyse de compte"}
+                  </button>
                 </div>
-                {loadingPatterns ? (
-                  <div className="loading-patterns">
-                    <div className="spinner"></div>
-                    <p>Analyse des patterns...</p>
+
+                {aError && (
+                  <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-red-200">
+                    {aError}
                   </div>
-                ) : patterns ? (
-                  <div className="patterns-content">
-                    {patterns.analysisCount === 0 ? (
-                      <div className="card no-data-card">
-                        <p>Aucune donnée disponible pour cette niche.</p>
-                        <p>Analysez des vidéos en mode &quot;Pro&quot; pour alimenter ce dashboard !</p>
-                      </div>
-                    ) : (
-                      <>
-                        {patterns.aggregatedStats && (
-                          <div className="card aggregated-stats">
-                            <div className="agg-stat">
-                              <div className="agg-value">{patterns.analysisCount}</div>
-                              <div className="agg-label">Vidéos analysées</div>
-                            </div>
-                            <div className="agg-stat">
-                              <div className="agg-value">{formatNumber(patterns.aggregatedStats.totalViews)}</div>
-                              <div className="agg-label">Vues totales</div>
-                            </div>
-                            <div className="agg-stat">
-                              <div className="agg-value">{patterns.aggregatedStats.avgEngagement?.toFixed(1) || 0}%</div>
-                              <div className="agg-label">Engagement moyen</div>
-                            </div>
-                          </div>
-                        )}
-                        {patterns.recentAnalyses && patterns.recentAnalyses.length > 0 && (
-                          <div className="card recent-analyses">
-                            <h3>📊 Analyses récentes</h3>
-                            <div className="analyses-list">
-                              {patterns.recentAnalyses.map((analysis, i) => (
-                                <div key={i} className="analysis-row">
-                                  <span className="analysis-user">@{analysis.username}</span>
-                                  <span className="analysis-views">{formatNumber(analysis.views)} vues</span>
-                                  <span className={`analysis-engagement ${getEngagementColor(analysis.engagement)}`}>{analysis.engagement?.toFixed(1) || 0}%</span>
-                                  <span className="analysis-time">{new Date(analysis.timestamp).toLocaleDateString('fr-FR')}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <div className="card no-data-card">
-                    <p>Erreur lors du chargement des patterns.</p>
+                )}
+
+                {aResult && (
+                  <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-4">
+                    <h3 className="text-xl font-semibold mb-2">Résultats compte (MVP)</h3>
+                    <pre className="text-sm whitespace-pre-wrap text-white/80">
+                      {JSON.stringify(aResult, null, 2)}
+                    </pre>
                   </div>
                 )}
               </div>
-            )}
-          </div>
-        </div>
-      </div>
+
+              <p className="mt-6 text-white/50 text-sm">
+                Note : le compte renverra plus tard les métriques agrégées (dernières vidéos, fréquence de post,
+                hooks récurrents, watch-time estimé, etc.). Cette page est prête à consommer l’API.
+              </p>
+            </div>
+          )}
+        </section>
+      </main>
     </>
   );
 }
