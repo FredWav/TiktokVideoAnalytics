@@ -103,7 +103,7 @@ export default function Home() {
         <div className="hero">
           <div className="hero-content">
             <h1 className="hero-title">Analyse <span className="highlight">TikTok</span> avec GPT-4o</h1>
-            <p className="hero-subtitle">Obtenez des insights de niveau professionnel sur n'importe quelle vidéo.</p>
+            <p className="hero-subtitle">Obtenez des insights de niveau professionnel sur n&apos;importe quelle vidéo.</p>
 
             {activeTab === "analyze" && (
               <div className="input-section">
@@ -151,7 +151,7 @@ export default function Home() {
                             <ul className="ai-list">
                               <li><strong>Type de contenu :</strong> {result.analysis.contentType}</li>
                               <li><strong>Hook (Accroche) :</strong> {result.analysis.hookScore}/10</li>
-                              <li><strong>CTA (Appel à l'action) :</strong> {result.analysis.ctaScore}/10</li>
+                              <li><strong>CTA (Appel à l&apos;action) :</strong> {result.analysis.ctaScore}/10</li>
                               <li><strong>Points forts :</strong> {result.analysis.viralFactors?.join(', ')}</li>
                               <li><strong>Points faibles :</strong> {result.analysis.weakPoints?.join(', ')}</li>
                             </ul>
@@ -161,7 +161,7 @@ export default function Home() {
                       <div className="side-col">
                         {result.metrics && (
                           <div className="card performance-badge">
-                            <div className="badge-label">Taux d'engagements</div>
+                            <div className="badge-label">Taux d&apos;engagements</div>
                             <div className="engagement-table">
                               <div><strong>Global :</strong> {result.metrics.engagementRate.toFixed(1)}%</div>
                               <div><strong>Likes :</strong> {result.metrics.likeRate.toFixed(1)}%</div>
@@ -239,7 +239,7 @@ export default function Home() {
                     {patterns.analysisCount === 0 ? (
                       <div className="card no-data-card">
                         <p>Aucune donnée disponible pour cette niche.</p>
-                        <p>Analysez des vidéos en mode "Pro" pour alimenter ce dashboard !</p>
+                        <p>Analysez des vidéos en mode &quot;Pro&quot; pour alimenter ce dashboard !</p>
                       </div>
                     ) : (
                       <>
