@@ -1,7 +1,7 @@
 // pages/api/analyze.js
 import OpenAI from "openai";
 import { ScrapingBeeClient } from 'scrapingbee';
-import { scrapeTikTokVideo } from "../../lib/scrape";
+import { scrapeTikTokVideo } from "@/lib/scrape";
 import { saveVideoAnalysis } from '@/lib/database';
 
 function getPerformanceLevel(engagementRate) {

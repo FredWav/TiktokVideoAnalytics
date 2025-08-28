@@ -1,1 +1,9 @@
-{"compilerOptions": { "baseUrl": ".", "paths": { "@/lib/*": ["lib/*"] }}
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["*"],
+      "@/lib/*": ["lib/*"]
+    }
+  }
+}
